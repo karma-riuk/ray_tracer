@@ -2,6 +2,8 @@
 @file main.cpp
 */
 
+#include "glm/fwd.hpp"
+#include "glm/geometric.hpp"
 #include "glm/glm.hpp"
 #include <cmath>
 #include <ctime>
@@ -80,13 +82,29 @@ class Sphere : public Object {
 
         Place for your code: ray-sphere intersection. Remember to set all the fields of the hit
         structure:
-
-         hit.intersection =
-         hit.normal =
-         hit.distance =
-         hit.object = this;
-
         ------------------------------------------------- */
+
+        // Translate the current object as if the camera was in (0, 0, 0)
+        glm::vec3 t_center = center - ray.origin;
+
+        float dot = glm::dot(t_center, ray.direction);
+        float center_distance = glm::distance(ray.origin, t_center);
+        float D = sqrt(pow(center_distance, 2) - pow(dot, 2));
+
+        if (D > radius)
+            return hit; // no intersection
+
+        float t = dot - sqrt(pow(radius, 2) - pow(D, 2));
+
+        hit.hit = true;
+        hit.intersection = ray.direction * t;
+        hit.normal = hit.intersection - t_center;
+
+        hit.distance = glm::distance(ray.origin, hit.intersection);
+        hit.object = this;
+
+        // translate the instersection point back to camera's real origin
+        hit.intersection += ray.origin;
 
         return hit;
     }
@@ -142,8 +160,8 @@ int main(int argc, const char * argv[]) {
 
     int width = 1024;                      // width of the image
     int height = 768;                      // height of the image
-    float fov = 90;                        // field of view
-    float size = 2 * tan(fov / 2) / width; // size of the pixel
+    float fov = 90 * 3.14/180;                        // field of view
+    float size = (2 * tan(fov / 2)) / width; // size of the pixel
 
     float x0 = -(width * size) / 2;
     float y0 = (height * size) / 2;
@@ -159,11 +177,15 @@ int main(int argc, const char * argv[]) {
         ------------------------------------------------- */
 
     glm::vec3 origin(0, 0, 0);
+
     for (int i = 0; i < width; i++)
         for (int j = 0; j < height; j++) {
 
             // Definition of the ray
-            glm::vec3 direction(x0 + i * size + .5 * size, y0 + j * size + .5 * size, 1);
+            glm::vec3 direction(
+                    x0 + (i + .5) * size,
+                    y0 - (j + .5) * size,
+                    1);
             direction = glm::normalize(direction);
 
             Ray ray(origin, direction); // ray traversal
