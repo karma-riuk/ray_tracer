@@ -20,11 +20,12 @@ class Ray {
   public:
     glm::vec3 origin;    ///< Origin of the ray
     glm::vec3 direction; ///< Direction of the ray
-                         /**
-                          Contructor of the ray
-                          @param origin Origin of the ray
-                          @param direction Direction of the ray
-                          */
+
+    /**
+     Contructor of the ray
+     @param origin Origin of the ray
+     @param direction Direction of the ray
+     */
     Ray(glm::vec3 origin, glm::vec3 direction) : origin(origin), direction(direction) {}
 };
 
@@ -139,9 +140,13 @@ int main(int argc, const char * argv[]) {
 
     clock_t t = clock(); // variable for keeping the time of the rendering
 
-    int width = 1024; // width of the image
-    int height = 768; // height of the image
-    float fov = 90;   // field of view
+    int width = 1024;                      // width of the image
+    int height = 768;                      // height of the image
+    float fov = 90;                        // field of view
+    float size = 2 * tan(fov / 2) / width; // size of the pixel
+
+    float x0 = -(width * size) / 2;
+    float y0 = (height * size) / 2;
 
     sceneDefinition(); // Let's define the scene
 
@@ -153,23 +158,17 @@ int main(int argc, const char * argv[]) {
 
         ------------------------------------------------- */
 
+    glm::vec3 origin(0, 0, 0);
     for (int i = 0; i < width; i++)
         for (int j = 0; j < height; j++) {
 
-            /*
-
-            Place for your code: ray definition for pixel (i,j), ray traversal
-
-            */
-
             // Definition of the ray
-            // glm::vec3 origin(0, 0, 0);
-            // glm::vec3 direction(?, ?, ?);               // fill in the correct values
-            // direction = glm::normalize(direction);
+            glm::vec3 direction(x0 + i * size + .5 * size, y0 + j * size + .5 * size, 1);
+            direction = glm::normalize(direction);
 
-            // Ray ray(origin, direction);  // ray traversal
+            Ray ray(origin, direction); // ray traversal
 
-            // image.setPixel(i, j, trace_ray(ray));
+            image.setPixel(i, j, trace_ray(ray));
         }
 
     t = clock() - t;
