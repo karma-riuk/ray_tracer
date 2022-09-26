@@ -146,6 +146,7 @@ glm::vec3 trace_ray(Ray ray) {
 void sceneDefinition() {
     // first sphere (Excercise 1)
     objects.push_back(new Sphere(1.0, glm::vec3(-0, -2, 8), glm::vec3(0.6, 0.9, 0.6)));
+    objects.push_back(new Sphere(1.0, glm::vec3(1, -2, 8), glm::vec3(0.6, 0.6, 0.9)));
 
     /* -------------------------------------------------
 
