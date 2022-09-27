@@ -159,9 +159,9 @@ int main(int argc, const char * argv[]) {
 
     clock_t t = clock(); // variable for keeping the time of the rendering
 
-    int width = 1024;                      // width of the image
-    int height = 768;                      // height of the image
-    float fov = 90 * 3.14/180;                        // field of view
+    int width = 1024;                        // width of the image
+    int height = 768;                        // height of the image
+    float fov = glm::radians(90.);           // field of view
     float size = (2 * tan(fov / 2)) / width; // size of the pixel
 
     float x0 = -(width * size) / 2;
@@ -183,10 +183,7 @@ int main(int argc, const char * argv[]) {
         for (int j = 0; j < height; j++) {
 
             // Definition of the ray
-            glm::vec3 direction(
-                    x0 + (i + .5) * size,
-                    y0 - (j + .5) * size,
-                    1);
+            glm::vec3 direction(x0 + (i + .5) * size, y0 - (j + .5) * size, 1);
             direction = glm::normalize(direction);
 
             Ray ray(origin, direction); // ray traversal
