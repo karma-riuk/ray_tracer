@@ -102,6 +102,7 @@ class Sphere : public Object {
             float t2 = cdotd + sqrt(radius * radius - D * D);
 
             float t = t1;
+
             if (t < 0)
                 t = t2;
             if (t < 0) {
