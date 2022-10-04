@@ -50,6 +50,7 @@ struct Hit {
  */
 class Object {
   public:
+    bool is_light = false;
     glm::vec3 color;   ///< Color of the object
     Material material; ///< Structure describing the material of the object
                        /** A function computing an intersection, which returns the structure Hit */
@@ -123,6 +124,18 @@ class Sphere : public Object {
     }
 };
 
+class LightSphere : public Sphere {
+  public:
+    /**
+     The constructor of the sphere
+     @param radius Radius of the sphere
+     @param center Center of the sphere
+     */
+      LightSphere(float radius, glm::vec3 center, glm::vec3 color) : Sphere(radius, center, color) {
+          this->is_light = true;
+      }
+};
+
 /**
  Light class
  */
@@ -130,8 +143,13 @@ class Light {
   public:
     glm::vec3 position; ///< Position of the light source
     glm::vec3 color;    ///< Color/intentisty of the light source
-    Light(glm::vec3 position) : position(position) { color = glm::vec3(1.0); }
-    Light(glm::vec3 position, glm::vec3 color) : position(position), color(color) {}
+    LightSphere * sphere;
+    Light(glm::vec3 position) : position(position), color(1){ 
+        sphere = new LightSphere(0.1, position, color);
+    }
+    Light(glm::vec3 position, glm::vec3 color) : position(position), color(color) {
+        sphere = new LightSphere(0.1, position, color);
+    }
 };
 
 vector<Light *> lights; ///< A list of lights in the scene
@@ -199,19 +217,12 @@ glm::vec3 trace_ray(Ray ray) {
     glm::vec3 color(0.0);
 
     if (closest_hit.hit) {
-        bool isLight = false;
-        for (auto light : lights){
-            if (glm::distance(closest_hit.intersection, light->position) <= 0.6)
-            {
-                isLight = true;
-                break;
-            }
+        if (closest_hit.object->is_light) {
+            color = closest_hit.object->color;
         }
-        if (!isLight)
+        else
             color = PhongModel(closest_hit.intersection, closest_hit.normal,
                            glm::normalize(-ray.direction), closest_hit.object->getMaterial());
-        else
-            color = glm::vec3(1.0, 1.0, 1.0);
     } else {
         color = glm::vec3(0.0, 0.0, 0.0);
     }
@@ -245,14 +256,15 @@ void sceneDefinition() {
 
     objects.push_back(new Sphere(0.5, glm::vec3(-1, -2.5, 6), red_specular));
 
-    glm::vec3 light1_pos = glm::vec3(0, 26, 5);
-    glm::vec3 light2_pos = glm::vec3(0, 3, 12);
-    lights.push_back(new Light(light1_pos, glm::vec3(0.4)));
-    lights.push_back(new Light(light2_pos, glm::vec3(0.4)));
-    objects.push_back(new Sphere(0.5, light1_pos, red_specular));
-    objects.push_back(new Sphere(0.5, light2_pos, red_specular));
-
-    lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.4)));
+    Light * l1 = new Light(glm::vec3(0, 26, 5), glm::vec3(0.4));
+    Light * l2 = new Light(glm::vec3(0, 3, 12), glm::vec3(0.4));
+    Light * l3 = new Light(glm::vec3(0, 5, 1), glm::vec3(0.4));
+    lights.push_back(l1);
+    lights.push_back(l2);
+    lights.push_back(l3);
+    objects.push_back(l1->sphere);
+    objects.push_back(l2->sphere);
+    objects.push_back(l3->sphere);
 }
 
 Image generate_image(int n_frame) {
@@ -287,12 +299,21 @@ Image generate_image(int n_frame) {
 
 int main(int argc, const char * argv[]) {
 
+    clock_t t;
     for (int i = 0; i < FRAMES; i++) {
+        if (i == 0)
+            t = clock();
         Image image = generate_image(i);
         string filename = "./result";
         // filename += i;
         filename += ".ppm";
         image.writeImage(filename.c_str());
+        if (i == 0) {
+            t = clock() - t;
+            cout << "It took " << ((float)t) / CLOCKS_PER_SEC << " seconds to render the image." << endl;
+            cout << "I could render at " << (float)CLOCKS_PER_SEC / ((float)t) << " frames per second."
+                << endl;
+        }
     }
 
     return 0;
