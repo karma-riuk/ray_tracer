@@ -3,3 +3,4 @@ result.ppm
 main
 .DS_Store
 main.dSYM
+.vimspector.json
