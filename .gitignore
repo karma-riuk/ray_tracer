@@ -1,4 +1,7 @@
 feh*
+*.mp4
+frames/
+.vimspector.json
 result.ppm
 main
 .DS_Store
