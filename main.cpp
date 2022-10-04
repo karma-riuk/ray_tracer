@@ -13,7 +13,7 @@
 #include "Image.h"
 #include "Material.h"
 
-#define FRAMES 1
+#define FRAMES 60
 
 using namespace std;
 
@@ -69,10 +69,10 @@ class Object {
  */
 class Sphere : public Object {
   private:
-    float radius;     ///< Radius of the sphere
-    glm::vec3 center; ///< Center of the sphere
+    float radius; ///< Radius of the sphere
 
   public:
+    glm::vec3 center; ///< Center of the sphere
     /**
      The constructor of the sphere
      @param radius Radius of the sphere
@@ -131,9 +131,9 @@ class LightSphere : public Sphere {
      @param radius Radius of the sphere
      @param center Center of the sphere
      */
-      LightSphere(float radius, glm::vec3 center, glm::vec3 color) : Sphere(radius, center, color) {
-          this->is_light = true;
-      }
+    LightSphere(float radius, glm::vec3 center, glm::vec3 color) : Sphere(radius, center, color) {
+        this->is_light = true;
+    }
 };
 
 /**
@@ -144,7 +144,7 @@ class Light {
     glm::vec3 position; ///< Position of the light source
     glm::vec3 color;    ///< Color/intentisty of the light source
     LightSphere * sphere;
-    Light(glm::vec3 position) : position(position), color(1){ 
+    Light(glm::vec3 position) : position(position), color(1) {
         sphere = new LightSphere(0.1, position, color);
     }
     Light(glm::vec3 position, glm::vec3 color) : position(position), color(color) {
@@ -219,10 +219,9 @@ glm::vec3 trace_ray(Ray ray) {
     if (closest_hit.hit) {
         if (closest_hit.object->is_light) {
             color = closest_hit.object->color;
-        }
-        else
+        } else
             color = PhongModel(closest_hit.intersection, closest_hit.normal,
-                           glm::normalize(-ray.direction), closest_hit.object->getMaterial());
+                               glm::normalize(-ray.direction), closest_hit.object->getMaterial());
     } else {
         color = glm::vec3(0.0, 0.0, 0.0);
     }
@@ -256,9 +255,10 @@ void sceneDefinition() {
 
     objects.push_back(new Sphere(0.5, glm::vec3(-1, -2.5, 6), red_specular));
 
-    Light * l1 = new Light(glm::vec3(0, 26, 5), glm::vec3(0.4));
+    Light * l1 = new Light(glm::vec3(-15, 26, 5), glm::vec3(0.4));
     Light * l2 = new Light(glm::vec3(0, 3, 12), glm::vec3(0.4));
-    Light * l3 = new Light(glm::vec3(0, 5, 1), glm::vec3(0.4));
+    Light * l3 = new Light(glm::vec3(1, 6, 6), glm::vec3(0.4));
+
     lights.push_back(l1);
     lights.push_back(l2);
     lights.push_back(l3);
@@ -267,17 +267,20 @@ void sceneDefinition() {
     objects.push_back(l3->sphere);
 }
 
-Image generate_image(int n_frame) {
+Image generate_image(int time_stamp) {
     int width = 1024; // width of the image
     int height = 768; // height of the image
     float fov = 90;   // field of view
 
-    sceneDefinition(); // Let's define a scene
     Image image(width, height); // Create an image where we will store the result
 
     float s = 2 * tan(0.5 * fov / 180 * M_PI) / width;
     float X = -s * width / 2;
     float Y = s * height / 2;
+
+    lights[lights.size() - 1]->position -= glm::vec3(0, .2, 0);
+    lights[lights.size() - 1]->sphere->center -= glm::vec3(0, .2, 0);
+    objects[objects.size() - 1] = lights[lights.size() - 1]->sphere;
 
     for (int i = 0; i < width; i++)
         for (int j = 0; j < height; j++) {
@@ -298,21 +301,23 @@ Image generate_image(int n_frame) {
 }
 
 int main(int argc, const char * argv[]) {
+    sceneDefinition(); // Let's define a scene
 
     clock_t t;
     for (int i = 0; i < FRAMES; i++) {
         if (i == 0)
             t = clock();
         Image image = generate_image(i);
-        string filename = "./result";
-        // filename += i;
+        string filename = "./result_";
+        filename += to_string(i);
         filename += ".ppm";
         image.writeImage(filename.c_str());
         if (i == 0) {
             t = clock() - t;
-            cout << "It took " << ((float)t) / CLOCKS_PER_SEC << " seconds to render the image." << endl;
-            cout << "I could render at " << (float)CLOCKS_PER_SEC / ((float)t) << " frames per second."
-                << endl;
+            cout << "It took " << ((float)t) / CLOCKS_PER_SEC << " seconds to render the image."
+                 << endl;
+            cout << "I could render at " << (float)CLOCKS_PER_SEC / ((float)t)
+                 << " frames per second." << endl;
         }
     }
 
