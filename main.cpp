@@ -13,7 +13,8 @@
 #include "Image.h"
 #include "Material.h"
 
-#define FRAMES 60
+#define FRAMES 120
+#define LIGHT_SPEED .28f
 
 using namespace std;
 
@@ -84,6 +85,7 @@ class Sphere : public Object {
     }
     Sphere(float radius, glm::vec3 center, Material material) : radius(radius), center(center) {
         this->material = material;
+        this->color = glm::vec3(1);
     }
     /** Implementation of the intersection function*/
     Hit intersect(Ray ray) {
@@ -156,6 +158,10 @@ vector<Light *> lights; ///< A list of lights in the scene
 glm::vec3 ambient_light(1.0, 1.0, 1.0);
 vector<Object *> objects; ///< A list of all objects in the scene
 
+Light * moving_light;
+glm::vec3 l3_init_pos;
+glm::vec3 movement;
+
 /** Function for computing color of an object according to the Phong Model
  @param point A point belonging to the object for which the color is computed
  @param normal A normal vector the the point
@@ -178,7 +184,6 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec3 view_direction
 
     */
     color = material.ambient * ambient_light;
-    // std::cout << glm::to_string(color);
     for (auto light : lights) {
         glm::vec3 incident_light = point - light->position;
         glm::vec3 reflected = glm::normalize(glm::reflect(incident_light, normal));
@@ -207,8 +212,9 @@ glm::vec3 trace_ray(Ray ray) {
 
     closest_hit.hit = false;
     closest_hit.distance = INFINITY;
+    closest_hit.object = nullptr;
 
-    for (int k = 0; k < objects.size(); k++) {
+    for (size_t k = 0; k < objects.size(); k++) {
         Hit hit = objects[k]->intersect(ray);
         if (hit.hit == true && hit.distance < closest_hit.distance)
             closest_hit = hit;
@@ -227,6 +233,8 @@ glm::vec3 trace_ray(Ray ray) {
     }
     return color;
 }
+
+
 /**
  Function defining the scene
  */
@@ -257,7 +265,8 @@ void sceneDefinition() {
 
     Light * l1 = new Light(glm::vec3(-15, 26, 5), glm::vec3(0.4));
     Light * l2 = new Light(glm::vec3(0, 3, 12), glm::vec3(0.4));
-    Light * l3 = new Light(glm::vec3(1, 6, 6), glm::vec3(0.4));
+    Light * l3 = new Light(l3_init_pos, glm::vec3(0.4));
+    moving_light = l3;
 
     lights.push_back(l1);
     lights.push_back(l2);
@@ -265,6 +274,24 @@ void sceneDefinition() {
     objects.push_back(l1->sphere);
     objects.push_back(l2->sphere);
     objects.push_back(l3->sphere);
+}
+
+glm::mat3 get_rotation_matrix(float angle){
+    return glm::mat3(
+            cos(angle), 0, -sin(angle),
+            0, 0, 0, 
+            sin(angle), 0, cos(angle)
+            );
+}
+
+float get_random_angle(int range){
+    return glm::radians((float) (rand() % range) - (float) range/2);
+}
+
+void move_light(glm::vec3 movement){
+    moving_light->position += movement;
+    moving_light->sphere->center += movement;
+    objects[objects.size() - 1] = moving_light->sphere;
 }
 
 Image generate_image(int time_stamp) {
@@ -278,9 +305,17 @@ Image generate_image(int time_stamp) {
     float X = -s * width / 2;
     float Y = s * height / 2;
 
-    lights[lights.size() - 1]->position -= glm::vec3(0, .2, 0);
-    lights[lights.size() - 1]->sphere->center -= glm::vec3(0, .2, 0);
-    objects[objects.size() - 1] = lights[lights.size() - 1]->sphere;
+    // we make the light move randomly above the spheres
+    movement = get_rotation_matrix(get_random_angle(60)) * movement;
+
+    // if the light gets out of a certain range, it is forced to come back to
+    // its starting position
+    if (glm::distance(l3_init_pos, moving_light->position) > 2) {
+        movement -= glm::normalize(moving_light->position - l3_init_pos);
+        movement = glm::normalize(movement) * LIGHT_SPEED;
+    }
+
+    move_light(movement);
 
     for (int i = 0; i < width; i++)
         for (int j = 0; j < height; j++) {
@@ -301,14 +336,21 @@ Image generate_image(int time_stamp) {
 }
 
 int main(int argc, const char * argv[]) {
+    l3_init_pos = glm::vec3(1, 3, 7);
     sceneDefinition(); // Let's define a scene
 
+    srand((unsigned) 420); // set the seed of the random value generator, used for
+                         // the movement of the light
+
+    movement = get_rotation_matrix(get_random_angle(360)) * glm::vec3(0, 0, LIGHT_SPEED);
+
     clock_t t;
+
     for (int i = 0; i < FRAMES; i++) {
         if (i == 0)
             t = clock();
         Image image = generate_image(i);
-        string filename = "./result_";
+        string filename = "./frames/result_";
         filename += to_string(i);
         filename += ".ppm";
         image.writeImage(filename.c_str());
