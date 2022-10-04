@@ -1,6 +1,7 @@
 feh*
 *.ppm
 *.mp4
+frames/
 main
 .DS_Store
 main.dSYM
