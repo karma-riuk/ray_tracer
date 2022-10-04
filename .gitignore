@@ -1,5 +1,6 @@
 feh*
-result.ppm
+*.ppm
+*.mp4
 main
 .DS_Store
 main.dSYM
