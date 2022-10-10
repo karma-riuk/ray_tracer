@@ -158,17 +158,23 @@ public:
 		Hit hit;
 		hit.hit = false;
 		
-		/*
-		 
-		 
-		 
-		 Excercise 1 - Plane-ray intersection
-		 
-		 
-		 
-		 
-		 */
-		
+        float d_dot_N = glm::dot(ray.direction, normal);
+        if (d_dot_N == 0)
+            return hit;
+
+
+        float po_dot_N = glm::dot(point - ray.origin, normal);
+
+        float t = po_dot_N / d_dot_N;
+        if (t < 0)
+            return hit;
+        
+        hit.hit = true;
+        hit.intersection = ray.origin + ray.direction * t;
+        hit.normal =  (d_dot_N > 0 ? -1.f : 1.f) * normal;
+        hit.distance = glm::distance(ray.origin, hit.intersection);
+        hit.object = this;
+        hit.uv = glm::vec2(0);
 		return hit;
 	}
 };
@@ -301,16 +307,13 @@ void sceneDefinition (){
 	//textured.texture = &checkerboardTexture;
 	//objects.push_back(new Sphere(7.0, glm::vec3(-6,4,23), textured));
 	
+    objects.push_back(new Plane(glm::vec3(0, 0, -.01), glm::vec3(0, 0, 1))); // plane behind
+    objects.push_back(new Plane(glm::vec3(-15, 0, 0), glm::vec3(1, 0, 0))); // plane left
+    objects.push_back(new Plane(glm::vec3(15, 0, 0), glm::vec3(1, 0, 0))); // plane right
+    objects.push_back(new Plane(glm::vec3(0, -3, 0), glm::vec3(0, 1, 0))); // plane below
+    objects.push_back(new Plane(glm::vec3(0, 17, 0), glm::vec3(0, 1, 0))); // plane above
+    objects.push_back(new Plane(glm::vec3(0, 0, 30), glm::vec3(0, 0, 1))); // plane in front
 	
-	
-	/*
-	 
-	 
-	 Excercise 1 - Definition of planes and the materials
-	 
-	 
-	 
-	 */
 	
 	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(0.4)));
 	lights.push_back(new Light(glm::vec3(0, 1, 12), glm::vec3(0.4)));
