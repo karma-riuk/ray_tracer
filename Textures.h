@@ -7,30 +7,11 @@
 
 #ifndef Textures_h
 #define Textures_h
-
+#define N_SQUARES 16
 
 #include "glm/glm.hpp"
 
-glm::vec3 checkerboardTexture(glm::vec2 uv){
-
-    /*
-     
-     
-        Exercise 2 (3 points)
-     
-     
-    */
-    return glm::vec3(0.0);
-}
-glm::vec3 rainbowTexture(glm::vec2 uv){
-    /*
-     
-     
-        Exercise 2 (5 points)
-     
-     
-    */
-    return glm::vec3(0.0);
-}
+glm::vec3 checkerboardTexture(glm::vec2 uv);
+glm::vec3 rainbowTexture(glm::vec2 uv);
 
 #endif /* Textures_h */
