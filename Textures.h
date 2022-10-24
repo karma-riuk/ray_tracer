@@ -8,6 +8,8 @@
 #ifndef Textures_h
 #define Textures_h
 
+#define N_SQUARES 16
+#define N_STRIPES 6
 
 #include "glm/glm.hpp"
 
