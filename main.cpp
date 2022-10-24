@@ -81,11 +81,12 @@ public:
 		
 		/* ----- Assignment 5 ---------
 		 Set the two remaining matrices
-		
-		inverseTransformationMatrix =
-		normalMatrix =
-		 
 		 */
+		
+		inverseTransformationMatrix = glm::inverse(matrix);
+        normalMatrix = (glm::abs(glm::determinant(matrix)) == 1) 
+            ? matrix 
+            : glm::transpose(inverseTransformationMatrix);
 	}
 };
 
@@ -205,6 +206,7 @@ public:
 		 
 		*/
 	
+
 		/* If the intersection is found, you have to set all the critical fields in the Hit strucutre
 		 Remember that the final information about intersection point, normal vector and distance have to be given
 		 in the global coordinate system.
