@@ -9,6 +9,7 @@
 #include <vector>
 #include "glm/glm.hpp"
 #include "glm/gtx/transform.hpp"
+#include "glm/gtx/string_cast.hpp"
 
 #include "Image.h"
 #include "Material.h"
@@ -142,8 +143,8 @@ public:
 			hit.distance = glm::distance(ray.origin, hit.intersection);
 			hit.object = this;
 			
-			hit.uv.s = (asin(hit.normal.y) + M_PI/2)/M_PI;
-			hit.uv.t = (atan2(hit.normal.z,hit.normal.x) + M_PI) / (2*M_PI);
+			hit.uv.x = (asin(hit.normal.y) + M_PI/2)/M_PI;
+			hit.uv.y = (atan2(hit.normal.z,hit.normal.x) + M_PI) / M_PI;
         }
 		else{
             hit.hit = false;
@@ -188,8 +189,9 @@ public:
 };
 
 class Cone : public Object{
+    Plane base;
 public:
-	Cone(Material material){
+	Cone(Material material): base(glm::vec3(0, 1, 0), glm::vec3(0, 1, 0), material){
 		this->material = material;
 	}
 	Hit intersect(Ray ray){
@@ -205,19 +207,61 @@ public:
 		 Remember about normalizing all the directions after transformations.
 		 
 		*/
-	
 
-		/* If the intersection is found, you have to set all the critical fields in the Hit strucutre
-		 Remember that the final information about intersection point, normal vector and distance have to be given
-		 in the global coordinate system.
+        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
+        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
+        Ray local_ray(o, d);
+
+
+        float a, b, c; // constant to solve at^2 + bt + c = 0
+        a = pow(d.x, 2) - pow(d.y, 2) + pow(d.z, 2);
+        b = 2 * (d.x * o.x - d.y * o.y + d.z * o.z);
+        c = pow(o.x, 2) - pow(o.y, 2) + pow(o.z, 2);
+
+        float delta  = pow(b, 2) - 4 * a * c;
+        if ( delta < 0 )
+            return hit;
+
+        float t_1, t_2;
+        t_1 = (-b + sqrt(delta)) / ( 2 * a );
+        t_2 = (-b - sqrt(delta)) / ( 2 * a );
+
+
+        if (t_1 < 0 && t_2 < 0)
+            return hit;
+        glm::vec3 i1, i2;
+        i1 = o + t_1 * d;
+        i2 = o + t_2 * d;
+        if (i1.y < 0 && i2.y < 0 || i1.y > 1 && i2.y > 1)
+            return hit;
+
+        float t;
+        t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
 		 
-		hit.hit = true;
-		hit.object = this;
-		hit.intersection =
-		hit.normal =
-		hit.distance =
-		
-		 */
+        bool inside = false;
+        glm::vec3 i;
+        i = o + t * d;
+        if (i.y > 1) {
+            inside = true;
+            hit = base.intersect(local_ray);
+        }
+        else{
+            hit.hit = true;
+            hit.object = this;
+            hit.intersection = i;
+            float y = (pow(i.x, 2) + pow(i.z, 2))/i.y + i.y;
+
+            glm::vec3 normal = i - glm::vec3(0, y, 0) ;
+            hit.normal = normal;
+            hit.uv.x = glm::atan(i.x, i.z);
+            hit.uv.y = i.y;
+        }
+
+        // Retransform in global coordinates
+        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
+        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
+        hit.normal = glm::normalize(hit.normal);
+		hit.distance = glm::distance(ray.origin, hit.intersection);
 		
 		return hit;
 	}
@@ -341,7 +385,7 @@ void sceneDefinition (){
 	// ------ Assignment 5 -------
 	
 	// You can remove the green sphere as it should be replaced with a green cone
-	objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
+	// objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
 	
 	
 	
@@ -371,18 +415,35 @@ void sceneDefinition (){
 	Create two conse and add them to the collection of our objects.
 	Remember to create them with corresponding materials and transformation matrices
 	
+	*/
+
+    glm::mat4 green_cone_trans = 
+        glm::scale(
+        glm::translate(glm::vec3(6, -3, 7)) *
+        glm::rotate((float) glm::atan(3), glm::vec3(0, 0, 1)), glm::vec3(1, 3, 1));
 	
-	Cone *cone1 = new Cone(...);
-	cone1->setTransformation(...);
+	
+	Cone *cone1 = new Cone(green_diffuse);
+	cone1->setTransformation(green_cone_trans);
 	objects.push_back(cone1);
+
+    Material highly_specular_yellow{
+        .ambient = glm::vec3(0.1f, 0.1f, 0.03f),
+        .diffuse = glm::vec3(.6f, .6f, 0.1f),
+        .specular = glm::vec3(.6f),
+        .shininess = 100,
+    };
+
+    glm::mat4 yellow_cone_trans = 
+        glm::scale(
+        glm::translate(glm::vec3(5, 9, 14)) *
+        glm::rotate(3.1415f, glm::vec3(0, 0, 1)), glm::vec3(3, 12, 3));
 	
-	Cone *cone2 = new Cone(...);
-	cone2->setTransformation(...);
+	Cone *cone2 = new Cone(highly_specular_yellow);
+	cone2->setTransformation(yellow_cone_trans);
 	objects.push_back(cone2);
 	
-	*/
-	
-	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(1.0, 1.0, 1.0)));
+	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(1.f)));
 	lights.push_back(new Light(glm::vec3(0, 1, 12), glm::vec3(0.1)));
 	lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.4)));
 }
