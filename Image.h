@@ -12,6 +12,7 @@
 
 #ifndef Image_h
 #define Image_h
+#include "glm/glm.hpp"
 
 using namespace std;
 
@@ -29,7 +30,7 @@ public:
      @param width with of the image
      @param height height of the image
      */
-    Image(int width, int height): width(width), height(height);
+    Image(int width, int height);
     
     /**
      Writes and image to a file in ppm format
