@@ -106,50 +106,61 @@ public:
 	 @param center Center of the sphere
 	 @param color Color of the sphere
 	 */
-    Sphere(float radius, glm::vec3 center, glm::vec3 color) : radius(radius), center(center){
+    Sphere(glm::vec3 color) : radius(1), center(glm::vec3(0)){
 		this->color = color;
     }
-	Sphere(float radius, glm::vec3 center, Material material) : radius(radius), center(center){
+	Sphere(Material material) : radius(1), center(glm::vec3(0)){
 		this->material = material;
 	}
 	/** Implementation of the intersection function*/
     Hit intersect(Ray ray){
 
-        glm::vec3 c = center - ray.origin;
+        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
+        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
 
-        float cdotc = glm::dot(c,c);
-        float cdotd = glm::dot(c, ray.direction);
-
+        Ray local_ray(o, d);
         Hit hit;
+        hit.hit = false;
 
-        float D = 0;
-		if (cdotc > cdotd*cdotd){
-			D =  sqrt(cdotc - cdotd*cdotd);
-		}
-        if(D<=radius){
-            hit.hit = true;
-            float t1 = cdotd - sqrt(radius*radius - D*D);
-            float t2 = cdotd + sqrt(radius*radius - D*D);
+        float a, b, c;
+        a = pow(d.x, 2) + pow(d.y, 2) + pow(d.z, 2);
+        b = 2 * (d.x * o.x + d.y * o.y + d.z * o.z);
+        c = pow(o.x, 2) + pow(o.y, 2) + pow(o.z, 2) - 1;
 
-            float t = t1;
-            if(t<0) t = t2;
-            if(t<0){
-                hit.hit = false;
-                return hit;
-            }
+        float delta  = pow(b, 2) - 4 * a * c;
+        if ( delta < 0 )
+            return hit;
 
-			hit.intersection = ray.origin + t * ray.direction;
-			hit.normal = glm::normalize(hit.intersection - center);
-			hit.distance = glm::distance(ray.origin, hit.intersection);
-			hit.object = this;
-			
-			hit.uv.x = (asin(hit.normal.y) + M_PI/2)/M_PI;
-			hit.uv.y = (atan2(hit.normal.z,hit.normal.x) + M_PI) / M_PI;
-        }
-		else{
-            hit.hit = false;
-		}
-		return hit;
+        float t_1, t_2;
+        t_1 = (-b + sqrt(delta)) / ( 2 * a );
+        t_2 = (-b - sqrt(delta)) / ( 2 * a );
+
+
+        if (t_1 < 0 && t_2 < 0)
+            return hit;
+        glm::vec3 i1, i2;
+        i1 = o + t_1 * d;
+        i2 = o + t_2 * d;
+
+        float t;
+        t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
+                                                                   //
+        glm::vec3 i = o + t * d;
+        hit.intersection = i;
+        hit.normal = i;
+        hit.uv.x = (asin(i.y) + M_PI/2)/M_PI;
+        hit.uv.y = (atan2(i.z, i.x) + M_PI)/(2*M_PI);
+
+        // Retransform in global coordinates
+        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
+        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
+        hit.normal = glm::normalize(hit.normal);
+		hit.distance = glm::distance(ray.origin, hit.intersection);
+
+        hit.object = this;
+        hit.hit = true;
+
+        return hit;
     }
 };
 
@@ -377,8 +388,13 @@ void sceneDefinition (){
 	blue_specular.shininess = 100.0;
 
 
-	objects.push_back(new Sphere(1.0, glm::vec3(1,-2,8), blue_specular));
-	objects.push_back(new Sphere(0.5, glm::vec3(-1,-2.5,6), red_specular));
+
+    Sphere * blue_sphere = new Sphere(blue_specular);
+    blue_sphere->setTransformation(glm::translate(glm::vec3(1,-2,8)));
+	objects.push_back(blue_sphere);
+    Sphere * red_sphere = new Sphere(red_specular);
+    red_sphere->setTransformation(glm::scale(glm::translate(glm::vec3(-1,-2.5,6)), glm::vec3(.5)));
+	objects.push_back(red_sphere);
 	
 	
 	
@@ -392,7 +408,14 @@ void sceneDefinition (){
 	//Textured sphere
 	Material textured;
 	textured.texture = &rainbowTexture;
-	objects.push_back(new Sphere(7.0, glm::vec3(-6,4,23), textured));
+    Sphere * rainbow_sphere = new Sphere(textured);
+    // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f, glm::vec3(0, 1, 0)));
+    glm::mat4 translation = glm::translate(glm::vec3(-6,4,23));
+    glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
+    glm::mat4 scaling = glm::scale(glm::vec3(7));
+    cout << glm::to_string(translation * rotation * scaling) << endl;
+    rainbow_sphere->setTransformation(translation * rotation * scaling);
+	objects.push_back(rainbow_sphere);
 	
 	
 	//Planes
