@@ -46,6 +46,7 @@ struct Hit{
 };
 
 Hit find_closest_hit(Ray ray);
+glm::vec3 trace_ray(Ray ray);
 
 /**
  General class for the object
@@ -301,9 +302,12 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
 		color += lights[light_num]->color * (diffuse + specular) / r/r;
 	}
 	// color += ambient_light * material.ambient;
-	
 	color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
-	return color;
+	glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
+	Ray reflective_ray(point + (0.001f * reflective_direction), reflective_direction);
+	glm::vec3 relfective_component = material.reflectivness > 0 ? trace_ray(reflective_ray) : glm::vec3(0);
+	
+	return (1 - material.reflectivness) * color + (material.reflectivness * relfective_component) ;
 }
 
 Hit find_closest_hit(Ray ray) {
@@ -357,6 +361,7 @@ void sceneDefinition (){
 	blue_specular.ambient = glm::vec3(0.02f, 0.02f, 0.1f);
 	blue_specular.diffuse = glm::vec3(0.2f, 0.2f, 1.0f);
 	blue_specular.specular = glm::vec3(0.6);
+	blue_specular.reflectivness = 1.00f;
 	blue_specular.shininess = 100.0;
 
 
