@@ -329,6 +329,15 @@ Hit find_closest_hit(Ray ray) {
 	return closest_hit;
 }
 
+
+glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index){
+    glm::vec3 a = n * glm::dot(i, n);
+    glm::vec3 b = i - a;
+    float beta = 1/index;
+    float alpha = sqrt(1 + (1 - pow(beta, 2)) * (glm::dot(b, b) / glm::dot(a, a)));
+    return alpha * a + beta * b;
+}
+
 /**
  Functions that computes a color along the ray
  @param ray Ray that should be traced through the scene
@@ -353,13 +362,12 @@ glm::vec3 trace_ray(Ray ray){
 			else
 				cout << "from inside" << endl;
 
-			glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
-			Ray refraction_ray(closest_hit.intersection + ( refraction_direction), refraction_direction);
-			if (refraction_direction != glm::vec3(0)){
-				cout << "refraction direction " << glm::to_string(refraction_direction) << endl;
-				color = trace_ray(refraction_ray);
+			// glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
+			glm::vec3 refraction_direction = refract(ray.direction, closest_hit.normal, index);
 
-			}
+			Ray refraction_ray(closest_hit.intersection + ( refraction_direction), refraction_direction);
+            cout << "refraction direction " << glm::to_string(refraction_direction) << endl;
+            color = trace_ray(refraction_ray);
 		} else {
 			// cout << "omg the end" << endl;
 			color = PhongModel(closest_hit.intersection, closest_hit.normal, closest_hit.uv, glm::normalize(-ray.direction), closest_hit.object->getMaterial());
@@ -392,10 +400,11 @@ void sceneDefinition (){
 	blue_specular.shininess = 100.0;
 
 	Material refractive;
+	refractive.reflectiveness = .2f;
 	refractive.refractiveness = 2.0f;
 
 
-	// objects.push_back(new Sphere(1.0, glm::vec3(1,-2,8), blue_specular));
+	objects.push_back(new Sphere(1.0, glm::vec3(1,-2,8), blue_specular));
 	objects.push_back(new Sphere(0.5, glm::vec3(-1,-2.5,6), red_specular));
 	objects.push_back(new Sphere(2.0, glm::vec3(-3,-1, 8), refractive));
 	//objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
