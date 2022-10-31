@@ -9,7 +9,6 @@
 #include <vector>
 #include "glm/glm.hpp"
 #include "glm/gtx/transform.hpp"
-#include "glm/gtx/string_cast.hpp"
 
 #include "Image.h"
 #include "Material.h"
@@ -32,7 +31,6 @@ public:
     }
 };
 
-
 class Object;
 
 /**
@@ -46,6 +44,8 @@ struct Hit{
     Object *object; ///< A pointer to the intersected object
 	glm::vec2 uv; ///< Coordinates for computing the texture (texture coordinates)
 };
+
+Hit find_closest_hit(Ray ray);
 
 /**
  General class for the object
@@ -73,21 +73,11 @@ public:
 	void setMaterial(Material material){
 		this->material = material;
 	}
-	/** Functions for setting up all the transformation matrices
-	 @param matrix The matrix representing the transformation of the object in the global coordinates */
+	
 	void setTransformation(glm::mat4 matrix){
-		
 		transformationMatrix = matrix;
-		
-		
-		/* ----- Assignment 5 ---------
-		 Set the two remaining matrices
-		 */
-		
 		inverseTransformationMatrix = glm::inverse(matrix);
-        normalMatrix = (glm::abs(glm::determinant(matrix)) == 1) 
-            ? matrix 
-            : glm::transpose(inverseTransformationMatrix);
+		normalMatrix = glm::transpose(inverseTransformationMatrix);
 	}
 };
 
@@ -106,61 +96,50 @@ public:
 	 @param center Center of the sphere
 	 @param color Color of the sphere
 	 */
-    Sphere(glm::vec3 color) : radius(1), center(glm::vec3(0)){
+    Sphere(float radius, glm::vec3 center, glm::vec3 color) : radius(radius), center(center){
 		this->color = color;
     }
-	Sphere(Material material) : radius(1), center(glm::vec3(0)){
+	Sphere(float radius, glm::vec3 center, Material material) : radius(radius), center(center){
 		this->material = material;
 	}
 	/** Implementation of the intersection function*/
     Hit intersect(Ray ray){
 
-        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
-        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
+        glm::vec3 c = center - ray.origin;
 
-        Ray local_ray(o, d);
+        float cdotc = glm::dot(c,c);
+        float cdotd = glm::dot(c, ray.direction);
+
         Hit hit;
-        hit.hit = false;
 
-        float a, b, c;
-        a = pow(d.x, 2) + pow(d.y, 2) + pow(d.z, 2);
-        b = 2 * (d.x * o.x + d.y * o.y + d.z * o.z);
-        c = pow(o.x, 2) + pow(o.y, 2) + pow(o.z, 2) - 1;
+        float D = 0;
+		if (cdotc > cdotd*cdotd){
+			D =  sqrt(cdotc - cdotd*cdotd);
+		}
+        if(D<=radius){
+            hit.hit = true;
+            float t1 = cdotd - sqrt(radius*radius - D*D);
+            float t2 = cdotd + sqrt(radius*radius - D*D);
 
-        float delta  = pow(b, 2) - 4 * a * c;
-        if ( delta < 0 )
-            return hit;
+            float t = t1;
+            if(t<0) t = t2;
+            if(t<0){
+                hit.hit = false;
+                return hit;
+            }
 
-        float t_1, t_2;
-        t_1 = (-b + sqrt(delta)) / ( 2 * a );
-        t_2 = (-b - sqrt(delta)) / ( 2 * a );
-
-
-        if (t_1 < 0 && t_2 < 0)
-            return hit;
-        glm::vec3 i1, i2;
-        i1 = o + t_1 * d;
-        i2 = o + t_2 * d;
-
-        float t;
-        t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
-                                                                   //
-        glm::vec3 i = o + t * d;
-        hit.intersection = i;
-        hit.normal = i;
-        hit.uv.x = (asin(i.y) + M_PI/2)/M_PI;
-        hit.uv.y = (atan2(i.z, i.x) + M_PI)/(2*M_PI);
-
-        // Retransform in global coordinates
-        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
-        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
-        hit.normal = glm::normalize(hit.normal);
-		hit.distance = glm::distance(ray.origin, hit.intersection);
-
-        hit.object = this;
-        hit.hit = true;
-
-        return hit;
+			hit.intersection = ray.origin + t * ray.direction;
+			hit.normal = glm::normalize(hit.intersection - center);
+			hit.distance = glm::distance(ray.origin, hit.intersection);
+			hit.object = this;
+			
+			hit.uv.s = (asin(hit.normal.y) + M_PI/2)/M_PI;
+			hit.uv.t = (atan2(hit.normal.z,hit.normal.x) + M_PI) / (2*M_PI);
+        }
+		else{
+            hit.hit = false;
+		}
+		return hit;
     }
 };
 
@@ -200,79 +179,63 @@ public:
 };
 
 class Cone : public Object{
-    Plane base;
+private:
+	Plane *plane;
 public:
-	Cone(Material material): base(glm::vec3(0, 1, 0), glm::vec3(0, 1, 0), material){
+	Cone(Material material){
 		this->material = material;
+		plane = new Plane(glm::vec3(0,1,0), glm::vec3(0.0,1,0));
 	}
 	Hit intersect(Ray ray){
 		
 		Hit hit;
 		hit.hit = false;
 		
-	
-		/*  ---- Assignemnt 5 -----
+		glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0.0); //implicit cast to vec3
+		glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1.0); //implicit cast to vec3
+		d = glm::normalize(d);
 		
-		 Implement the ray-cone intersection. Before intersecting the ray with the cone,
-		 make sure that you transform the ray into the local coordinate system.
-		 Remember about normalizing all the directions after transformations.
-		 
-		*/
-
-        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
-        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
-        Ray local_ray(o, d);
-
-
-        float a, b, c; // constant to solve at^2 + bt + c = 0
-        a = pow(d.x, 2) - pow(d.y, 2) + pow(d.z, 2);
-        b = 2 * (d.x * o.x - d.y * o.y + d.z * o.z);
-        c = pow(o.x, 2) - pow(o.y, 2) + pow(o.z, 2);
-
-        float delta  = pow(b, 2) - 4 * a * c;
-        if ( delta < 0 )
-            return hit;
-
-        float t_1, t_2;
-        t_1 = (-b + sqrt(delta)) / ( 2 * a );
-        t_2 = (-b - sqrt(delta)) / ( 2 * a );
-
-
-        if (t_1 < 0 && t_2 < 0)
-            return hit;
-        glm::vec3 i1, i2;
-        i1 = o + t_1 * d;
-        i2 = o + t_2 * d;
-        if (i1.y < 0 && i2.y < 0 || i1.y > 1 && i2.y > 1)
-            return hit;
-
-        float t;
-        t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
-		 
-        bool inside = false;
-        glm::vec3 i;
-        i = o + t * d;
-        if (i.y > 1) {
-            inside = true;
-            hit = base.intersect(local_ray);
-        }
-        else{
-            hit.hit = true;
-            hit.object = this;
-            hit.intersection = i;
-            float y = (pow(i.x, 2) + pow(i.z, 2))/i.y + i.y;
-
-            glm::vec3 normal = i - glm::vec3(0, y, 0) ;
-            hit.normal = normal;
-            hit.uv.x = glm::atan(i.x, i.z);
-            hit.uv.y = i.y;
-        }
-
-        // Retransform in global coordinates
-        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
-        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
-        hit.normal = glm::normalize(hit.normal);
-		hit.distance = glm::distance(ray.origin, hit.intersection);
+		
+		float a = d.x*d.x + d.z*d.z - d.y*d.y;
+		float b = 2 * (d.x * o.x + d.z * o.z - d.y * o.y);
+		float c = o.x * o.x + o.z * o.z - o.y * o.y;
+		
+		float delta = b*b - 4 * a * c;
+		
+		if(delta < 0){
+			return hit;
+		}
+		
+		float t1 = (-b-sqrt(delta)) / (2*a);
+		float t2 = (-b+sqrt(delta)) / (2*a);
+		
+		float t = t1;
+		hit.intersection = o + t*d;
+		if(t<0 || hit.intersection.y>1 || hit.intersection.y<0){
+			t = t2;
+			hit.intersection = o + t*d;
+			if(t<0 || hit.intersection.y>1 || hit.intersection.y<0){
+				return hit;
+			}
+		};
+	
+		hit.normal = glm::vec3(hit.intersection.x, -hit.intersection.y, hit.intersection.z);
+		hit.normal = glm::normalize(hit.normal);
+	
+		
+		Ray new_ray(o,d);
+		Hit hit_plane = plane->intersect(new_ray);
+		if(hit_plane.hit && hit_plane.distance < t && length(hit_plane.intersection - glm::vec3(0,1,0)) <= 1.0 ){
+			hit.intersection = hit_plane.intersection;
+			hit.normal = hit_plane.normal;
+		}
+		
+		hit.hit = true;
+		hit.object = this;
+		hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1.0); //implicit cast to vec3
+		hit.normal = (normalMatrix * glm::vec4(hit.normal, 0.0)); //implicit cast to vec3
+		hit.normal = glm::normalize(hit.normal);
+		hit.distance = glm::length(hit.intersection - ray.origin);
 		
 		return hit;
 	}
@@ -307,10 +270,15 @@ vector<Object *> objects; ///< A list of all objects in the scene
 */
 glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 view_direction, Material material){
 
-	glm::vec3 color(0.0);
+	glm::vec3 color = ambient_light * material.ambient;
 	for(int light_num = 0; light_num < lights.size(); light_num++){
-
-		glm::vec3 light_direction = glm::normalize(lights[light_num]->position - point);
+		
+		glm::vec3 light_position = lights[light_num]->position;
+		glm::vec3 light_direction = glm::normalize(light_position - point);
+		Ray light_ray(point + (0.001f * light_direction), light_direction);
+		Hit closest_hit = find_closest_hit(light_ray);
+		if (closest_hit.distance < glm::distance(point, light_position)) 
+			continue;
 		glm::vec3 reflected_direction = glm::reflect(-light_direction, normal);
 
 		float NdotL = glm::clamp(glm::dot(normal, light_direction), 0.0f, 1.0f);
@@ -330,22 +298,15 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
 		float r = glm::distance(point,lights[light_num]->position);
 		r = max(r, 0.1f);
 		
-
 		color += lights[light_num]->color * (diffuse + specular) / r/r;
 	}
-	color += ambient_light * material.ambient;
+	// color += ambient_light * material.ambient;
 	
 	color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
 	return color;
 }
 
-/**
- Functions that computes a color along the ray
- @param ray Ray that should be traced through the scene
- @return Color at the intersection point
- */
-glm::vec3 trace_ray(Ray ray){
-
+Hit find_closest_hit(Ray ray) {
 	Hit closest_hit;
 
 	closest_hit.hit = false;
@@ -356,6 +317,17 @@ glm::vec3 trace_ray(Ray ray){
 		if(hit.hit == true && hit.distance < closest_hit.distance)
 			closest_hit = hit;
 	}
+	return closest_hit;
+}
+
+/**
+ Functions that computes a color along the ray
+ @param ray Ray that should be traced through the scene
+ @return Color at the intersection point
+ */
+glm::vec3 trace_ray(Ray ray){
+
+	Hit closest_hit = find_closest_hit(ray);
 
 	glm::vec3 color(0.0);
 
@@ -388,34 +360,16 @@ void sceneDefinition (){
 	blue_specular.shininess = 100.0;
 
 
-
-    Sphere * blue_sphere = new Sphere(blue_specular);
-    blue_sphere->setTransformation(glm::translate(glm::vec3(1,-2,8)));
-	objects.push_back(blue_sphere);
-    Sphere * red_sphere = new Sphere(red_specular);
-    red_sphere->setTransformation(glm::scale(glm::translate(glm::vec3(-1,-2.5,6)), glm::vec3(.5)));
-	objects.push_back(red_sphere);
-	
-	
-	
-	// ------ Assignment 5 -------
-	
-	// You can remove the green sphere as it should be replaced with a green cone
-	// objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
-	
+	objects.push_back(new Sphere(1.0, glm::vec3(1,-2,8), blue_specular));
+	objects.push_back(new Sphere(0.5, glm::vec3(-1,-2.5,6), red_specular));
+	//objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
 	
 	
 	//Textured sphere
+	
 	Material textured;
 	textured.texture = &rainbowTexture;
-    Sphere * rainbow_sphere = new Sphere(textured);
-    // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f, glm::vec3(0, 1, 0)));
-    glm::mat4 translation = glm::translate(glm::vec3(-6,4,23));
-    glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
-    glm::mat4 scaling = glm::scale(glm::vec3(7));
-    cout << glm::to_string(translation * rotation * scaling) << endl;
-    rainbow_sphere->setTransformation(translation * rotation * scaling);
-	objects.push_back(rainbow_sphere);
+	objects.push_back(new Sphere(7.0, glm::vec3(-6,4,23), textured));
 	
 	
 	//Planes
@@ -434,39 +388,30 @@ void sceneDefinition (){
 	objects.push_back(new Plane(glm::vec3(0,1,-0.01), glm::vec3(0.0,0.0,1.0), green_diffuse));
 	
 	
-	/* ----- Assignment 5 -------
-	Create two conse and add them to the collection of our objects.
-	Remember to create them with corresponding materials and transformation matrices
+	// Cone
 	
-	*/
-
-    glm::mat4 green_cone_trans = 
-        glm::scale(
-        glm::translate(glm::vec3(6, -3, 7)) *
-        glm::rotate((float) glm::atan(3), glm::vec3(0, 0, 1)), glm::vec3(1, 3, 1));
+	Material yellow_specular;
+	yellow_specular.ambient = glm::vec3(0.1f, 0.10f, 0.0f);
+	yellow_specular.diffuse = glm::vec3(0.4f, 0.4f, 0.0f);
+	yellow_specular.specular = glm::vec3(1.0);
+	yellow_specular.shininess = 100.0;
 	
+	Cone *cone = new Cone(yellow_specular);
+	glm::mat4 translationMatrix = glm::translate(glm::vec3(5,9,14));
+	glm::mat4 scalingMatrix = glm::scale(glm::vec3(3.0f, 12.0f, 3.0f));
+	glm::mat4 rotationMatrix = glm::rotate(glm::radians(180.0f) , glm::vec3(1,0,0));
+	cone->setTransformation(translationMatrix*scalingMatrix*rotationMatrix);
+	objects.push_back(cone);
 	
-	Cone *cone1 = new Cone(green_diffuse);
-	cone1->setTransformation(green_cone_trans);
-	objects.push_back(cone1);
-
-    Material highly_specular_yellow{
-        .ambient = glm::vec3(0.1f, 0.1f, 0.03f),
-        .diffuse = glm::vec3(.6f, .6f, 0.1f),
-        .specular = glm::vec3(.6f),
-        .shininess = 100,
-    };
-
-    glm::mat4 yellow_cone_trans = 
-        glm::scale(
-        glm::translate(glm::vec3(5, 9, 14)) *
-        glm::rotate(3.1415f, glm::vec3(0, 0, 1)), glm::vec3(3, 12, 3));
-	
-	Cone *cone2 = new Cone(highly_specular_yellow);
-	cone2->setTransformation(yellow_cone_trans);
+	Cone *cone2 = new Cone(green_diffuse);
+	translationMatrix = glm::translate(glm::vec3(6,-3,7));
+	scalingMatrix = glm::scale(glm::vec3(1.0f, 3.0f, 1.0f));
+	rotationMatrix = glm::rotate(glm::atan(3.0f), glm::vec3(0,0,1));
+	cone2->setTransformation(translationMatrix* rotationMatrix*scalingMatrix);
 	objects.push_back(cone2);
 	
-	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(1.f)));
+	
+	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(1.0, 1.0, 1.0)));
 	lights.push_back(new Light(glm::vec3(0, 1, 12), glm::vec3(0.1)));
 	lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.4)));
 }
