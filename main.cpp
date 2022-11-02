@@ -13,9 +13,9 @@
 
 #include "Image.h"
 #include "Material.h"
-#define EPS 0.001f
 
 using namespace std;
+#define EPS 0.0001f
 
 /**
  Class representing a single ray.
@@ -33,6 +33,7 @@ public:
     }
 };
 
+
 class Object;
 
 /**
@@ -45,11 +46,8 @@ struct Hit{
     float distance; ///< Distance from the origin of the ray to the intersection point
     Object *object; ///< A pointer to the intersected object
 	glm::vec2 uv; ///< Coordinates for computing the texture (texture coordinates)
-    bool from_outside;
+    bool from_outside = true;
 };
-
-Hit find_closest_hit(Ray ray);
-glm::vec3 trace_ray(Ray ray);
 
 /**
  General class for the object
@@ -77,11 +75,16 @@ public:
 	void setMaterial(Material material){
 		this->material = material;
 	}
-	
+	/** Functions for setting up all the transformation matrices
+	 @param matrix The matrix representing the transformation of the object in the global coordinates */
 	void setTransformation(glm::mat4 matrix){
+		
 		transformationMatrix = matrix;
+		
 		inverseTransformationMatrix = glm::inverse(matrix);
-		normalMatrix = glm::transpose(inverseTransformationMatrix);
+        normalMatrix = (glm::abs(glm::determinant(matrix)) == 1) 
+            ? matrix 
+            : glm::transpose(inverseTransformationMatrix);
 	}
 };
 
@@ -100,51 +103,64 @@ public:
 	 @param center Center of the sphere
 	 @param color Color of the sphere
 	 */
-    Sphere(float radius, glm::vec3 center, glm::vec3 color) : radius(radius), center(center){
+    Sphere(glm::vec3 color) : radius(1), center(glm::vec3(0)){
 		this->color = color;
     }
-	Sphere(float radius, glm::vec3 center, Material material) : radius(radius), center(center){
+	Sphere(Material material) : radius(1), center(glm::vec3(0)){
 		this->material = material;
 	}
 	/** Implementation of the intersection function*/
     Hit intersect(Ray ray){
 
-        glm::vec3 c = center - ray.origin;
+        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
+        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
 
-        float cdotc = glm::dot(c,c);
-        float cdotd = glm::dot(c, ray.direction);
-
+        Ray local_ray(o, d);
         Hit hit;
+        hit.hit = false;
 
-        float D = 0;
-		if (cdotc > cdotd*cdotd){
-			D =  sqrt(cdotc - cdotd*cdotd);
-		}
-        if(D<=radius){
-            hit.hit = true;
-            float t1 = cdotd - sqrt(radius*radius - D*D);
-            float t2 = cdotd + sqrt(radius*radius - D*D);
+        float a, b, c;
+        a = pow(d.x, 2) + pow(d.y, 2) + pow(d.z, 2);
+        b = 2 * (d.x * o.x + d.y * o.y + d.z * o.z);
+        c = pow(o.x, 2) + pow(o.y, 2) + pow(o.z, 2) - 1;
 
-            float t = t1;
-            if(t<0) t = t2;
-            if(t<0){
-                hit.hit = false;
-                return hit;
-            }
+        float delta  = pow(b, 2) - 4 * a * c;
+        if ( delta < 0 )
+            return hit;
 
-			hit.intersection = ray.origin + t * ray.direction;
-			hit.normal = glm::normalize(hit.intersection - center);
-			hit.distance = glm::distance(ray.origin, hit.intersection);
-			hit.object = this;
-            hit.from_outside = glm::dot(ray.direction, hit.normal) <= 0;
-			
-			hit.uv.s = (asin(hit.normal.y) + M_PI/2)/M_PI;
-			hit.uv.t = (atan2(hit.normal.z,hit.normal.x) + M_PI) / (2*M_PI);
-        }
-		else{
-            hit.hit = false;
-		}
-		return hit;
+        float t_1, t_2;
+        t_1 = (-b + sqrt(delta)) / ( 2 * a );
+        t_2 = (-b - sqrt(delta)) / ( 2 * a );
+
+
+        if (t_1 < 0 && t_2 < 0)
+            return hit;
+        glm::vec3 i1, i2;
+        i1 = o + t_1 * d;
+        i2 = o + t_2 * d;
+
+        float t;
+        t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
+                                                                   //
+        glm::vec3 i = o + t * d;
+        hit.intersection = i;
+        hit.normal = i;
+        hit.uv.x = (asin(i.y) + M_PI/2)/M_PI;
+        hit.uv.y = (atan2(i.z, i.x) + M_PI)/(2*M_PI);
+
+        bool from_inside = glm::all(glm::lessThan(glm::abs(o), glm::vec3(1)));
+        hit.from_outside = !from_inside;
+
+        // Retransform in global coordinates
+        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
+        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
+        hit.normal = glm::normalize(hit.normal);
+		hit.distance = glm::distance(ray.origin, hit.intersection);
+
+        hit.object = this;
+        hit.hit = true;
+
+        return hit;
     }
 };
 
@@ -152,8 +168,8 @@ public:
 class Plane : public Object{
 
 private:
-	glm::vec3 normal;
 	glm::vec3 point;
+	glm::vec3 normal;
 
 public:
 	Plane(glm::vec3 point, glm::vec3 normal) : point(point), normal(normal){
@@ -184,63 +200,68 @@ public:
 };
 
 class Cone : public Object{
-private:
-	Plane *plane;
+    Plane base;
 public:
-	Cone(Material material){
+	Cone(Material material): base(glm::vec3(0, 1, 0), glm::vec3(0, 1, 0), material){
 		this->material = material;
-		plane = new Plane(glm::vec3(0,1,0), glm::vec3(0.0,1,0));
 	}
 	Hit intersect(Ray ray){
 		
 		Hit hit;
 		hit.hit = false;
-		
-		glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0.0); //implicit cast to vec3
-		glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1.0); //implicit cast to vec3
-		d = glm::normalize(d);
-		
-		
-		float a = d.x*d.x + d.z*d.z - d.y*d.y;
-		float b = 2 * (d.x * o.x + d.z * o.z - d.y * o.y);
-		float c = o.x * o.x + o.z * o.z - o.y * o.y;
-		
-		float delta = b*b - 4 * a * c;
-		
-		if(delta < 0){
-			return hit;
-		}
-		
-		float t1 = (-b-sqrt(delta)) / (2*a);
-		float t2 = (-b+sqrt(delta)) / (2*a);
-		
-		float t = t1;
-		hit.intersection = o + t*d;
-		if(t<0 || hit.intersection.y>1 || hit.intersection.y<0){
-			t = t2;
-			hit.intersection = o + t*d;
-			if(t<0 || hit.intersection.y>1 || hit.intersection.y<0){
-				return hit;
-			}
-		};
-	
-		hit.normal = glm::vec3(hit.intersection.x, -hit.intersection.y, hit.intersection.z);
-		hit.normal = glm::normalize(hit.normal);
-	
-		
-		Ray new_ray(o,d);
-		Hit hit_plane = plane->intersect(new_ray);
-		if(hit_plane.hit && hit_plane.distance < t && length(hit_plane.intersection - glm::vec3(0,1,0)) <= 1.0 ){
-			hit.intersection = hit_plane.intersection;
-			hit.normal = hit_plane.normal;
-		}
-		
-		hit.hit = true;
-		hit.object = this;
-		hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1.0); //implicit cast to vec3
-		hit.normal = (normalMatrix * glm::vec4(hit.normal, 0.0)); //implicit cast to vec3
-		hit.normal = glm::normalize(hit.normal);
-		hit.distance = glm::length(hit.intersection - ray.origin);
+
+        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
+        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
+        Ray local_ray(o, d);
+
+
+        float a, b, c; // constant to solve at^2 + bt + c = 0
+        a = pow(d.x, 2) - pow(d.y, 2) + pow(d.z, 2);
+        b = 2 * (d.x * o.x - d.y * o.y + d.z * o.z);
+        c = pow(o.x, 2) - pow(o.y, 2) + pow(o.z, 2);
+
+        float delta  = pow(b, 2) - 4 * a * c;
+        if ( delta < 0 )
+            return hit;
+
+        float t_1, t_2;
+        t_1 = (-b + sqrt(delta)) / ( 2 * a );
+        t_2 = (-b - sqrt(delta)) / ( 2 * a );
+
+
+        if (t_1 < 0 && t_2 < 0)
+            return hit;
+        glm::vec3 i1, i2;
+        i1 = o + t_1 * d;
+        i2 = o + t_2 * d;
+        if ((i1.y < 0 && i2.y < 0) || (i1.y > 1 && i2.y > 1))
+            return hit;
+
+        float t;
+        t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
+		 
+        glm::vec3 i;
+        i = o + t * d;
+        if (i.y > 1) {
+            hit = base.intersect(local_ray);
+        }
+        else{
+            hit.hit = true;
+            hit.object = this;
+            hit.intersection = i;
+            float y = (pow(i.x, 2) + pow(i.z, 2))/i.y + i.y;
+
+            glm::vec3 normal = i - glm::vec3(0, y, 0) ;
+            hit.normal = normal;
+            hit.uv.x = glm::atan(i.x, i.z);
+            hit.uv.y = i.y;
+        }
+
+        // Retransform in global coordinates
+        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
+        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
+        hit.normal = glm::normalize(hit.normal);
+		hit.distance = glm::distance(ray.origin, hit.intersection);
 		
 		return hit;
 	}
@@ -264,6 +285,8 @@ public:
 vector<Light *> lights; ///< A list of lights in the scene
 glm::vec3 ambient_light(0.001,0.001,0.001);
 vector<Object *> objects; ///< A list of all objects in the scene
+glm::vec3 tray_ray(Ray ray);
+Hit find_closest_hit(Ray ray);
 
 glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index){
     glm::vec3 a = n * glm::dot(i, n);
@@ -272,7 +295,6 @@ glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index){
     float alpha = sqrt(1 + (1 - pow(beta, 2)) * (glm::dot(b, b) / glm::dot(a, a)));
     return alpha * a + beta * b;
 }
-
 
 /** Function for computing color of an object according to the Phong Model
  @param point A point belonging to the object for which the color is computer
@@ -286,7 +308,7 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
 
     glm::vec3 color = ambient_light * material.ambient;
 
-    for(int light_num = 0; light_num < lights.size(); light_num++){
+    for(size_t light_num = 0; light_num < lights.size(); light_num++){
 
         glm::vec3 light_position = lights[light_num]->position;
         glm::vec3 light_direction = glm::normalize(light_position - point);
@@ -329,7 +351,7 @@ Hit find_closest_hit(Ray ray) {
 	closest_hit.hit = false;
 	closest_hit.distance = INFINITY;
 
-	for(int k = 0; k<objects.size(); k++){
+	for(size_t k = 0; k<objects.size(); k++){
 		Hit hit = objects[k]->intersect(ray);
 		if(hit.hit == true && hit.distance > 0.01f && hit.distance < closest_hit.distance)
 			closest_hit = hit;
@@ -359,15 +381,15 @@ glm::vec3 trace_ray(Ray ray){
     glm::vec3 normal = closest_hit.normal;
     glm::vec3 point = closest_hit.intersection;
 
+
     if (material.refractiveness > 0){
         float index = closest_hit.from_outside ? material.refractiveness : 1 / material.refractiveness;
 
         // glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
         glm::vec3 refraction_direction = refract(-view_direction, normal, index);
 
+
         Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
-        // cout << "our refraction" << glm::to_string(refraction_direction) << endl;
-        // cout << "glm refraction" << glm::to_string(glm::refract(-view_direction, normal, index)) << endl << endl;
         color = trace_ray(refraction_ray);
     }
 
@@ -376,8 +398,8 @@ glm::vec3 trace_ray(Ray ray){
         glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
         Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
 
-        if (closest_hit.from_outside) // this guard is because since a refracting object is also
-                          // relfecting (Frensel effect), 
+
+        if (closest_hit.from_outside)
             relfective_component = trace_ray(reflective_ray);
         color = (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component);
     }
@@ -403,29 +425,41 @@ void sceneDefinition (){
 	blue_specular.ambient = glm::vec3(0.02f, 0.02f, 0.1f);
 	blue_specular.diffuse = glm::vec3(0.2f, 0.2f, 1.0f);
 	blue_specular.specular = glm::vec3(0.6);
-	blue_specular.reflectiveness = 1.00f;
 	blue_specular.shininess = 100.0;
+    blue_specular.reflectiveness = .9f;
 
-	Material refractive;
-	refractive.ambient = glm::vec3(0.02f, 0.02f, 0.1f);
-	refractive.diffuse = glm::vec3(0.2f, 0.2f, 1.0f);
-	refractive.specular = glm::vec3(0.6);
-	refractive.reflectiveness = .1f; // TODO: prolly not right
-	refractive.refractiveness = 2.0f;
+    Material refractive{
+        .reflectiveness = 0.1f,
+        .refractiveness = 2.0f
+    };
 
 
-	objects.push_back(new Sphere(1.0, glm::vec3(1,-2,8), blue_specular));
-	objects.push_back(new Sphere(0.5, glm::vec3(-1,-2.5,6), red_specular));
-	objects.push_back(new Sphere(2.0, glm::vec3(-3,-1, 8), refractive));
-	// objects.push_back(new Sphere(2.0, glm::vec3(-3,1, 8), refractive));
-	//objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
+
+    Sphere * blue_sphere = new Sphere(blue_specular);
+    blue_sphere->setTransformation(glm::translate(glm::vec3(1,-2,8)));
+	objects.push_back(blue_sphere);
+    Sphere * red_sphere = new Sphere(red_specular);
+    red_sphere->setTransformation(glm::scale(glm::translate(glm::vec3(-1,-2.5,6)), glm::vec3(.5)));
+	objects.push_back(red_sphere);
+
+    Sphere * refractive_sphere = new Sphere(refractive);
+    refractive_sphere->setTransformation(glm::translate(glm::vec3(-3, -1, 8)) * glm::scale(glm::vec3(2)));
+	objects.push_back(refractive_sphere);
+	
+	
+	
 	
 	
 	//Textured sphere
-	
 	Material textured;
 	textured.texture = &rainbowTexture;
-	objects.push_back(new Sphere(7.0, glm::vec3(-6,4,23), textured));
+    Sphere * rainbow_sphere = new Sphere(textured);
+    // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f, glm::vec3(0, 1, 0)));
+    glm::mat4 translation = glm::translate(glm::vec3(-6,4,23));
+    glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
+    glm::mat4 scaling = glm::scale(glm::vec3(7));
+    rainbow_sphere->setTransformation(translation * rotation * scaling);
+	objects.push_back(rainbow_sphere);
 	
 	
 	//Planes
@@ -443,33 +477,36 @@ void sceneDefinition (){
 	objects.push_back(new Plane(glm::vec3(0,27,0), glm::vec3(0.0,-1,0)));
 	objects.push_back(new Plane(glm::vec3(0,1,-0.01), glm::vec3(0.0,0.0,1.0), green_diffuse));
 	
+
+    glm::mat4 green_cone_trans = 
+        glm::scale(
+        glm::translate(glm::vec3(6, -3, 7)) *
+        glm::rotate((float) glm::atan(3), glm::vec3(0, 0, 1)), glm::vec3(1, 3, 1));
 	
-	// Cone
 	
-	Material yellow_specular;
-	yellow_specular.ambient = glm::vec3(0.1f, 0.10f, 0.0f);
-	yellow_specular.diffuse = glm::vec3(0.4f, 0.4f, 0.0f);
-	yellow_specular.specular = glm::vec3(1.0);
-	yellow_specular.shininess = 100.0;
+	Cone *cone1 = new Cone(green_diffuse);
+	cone1->setTransformation(green_cone_trans);
+	objects.push_back(cone1);
+
+    Material highly_specular_yellow{
+        .ambient = glm::vec3(0.1f, 0.1f, 0.03f),
+        .diffuse = glm::vec3(.6f, .6f, 0.1f),
+        .specular = glm::vec3(.6f),
+        .shininess = 100,
+    };
+
+    glm::mat4 yellow_cone_trans = 
+        glm::scale(
+        glm::translate(glm::vec3(5, 9, 14)) *
+        glm::rotate(3.1415f, glm::vec3(0, 0, 1)), glm::vec3(3, 12, 3));
 	
-	Cone *cone = new Cone(yellow_specular);
-	glm::mat4 translationMatrix = glm::translate(glm::vec3(5,9,14));
-	glm::mat4 scalingMatrix = glm::scale(glm::vec3(3.0f, 12.0f, 3.0f));
-	glm::mat4 rotationMatrix = glm::rotate(glm::radians(180.0f) , glm::vec3(1,0,0));
-	cone->setTransformation(translationMatrix*scalingMatrix*rotationMatrix);
-	objects.push_back(cone);
-	
-	Cone *cone2 = new Cone(green_diffuse);
-	translationMatrix = glm::translate(glm::vec3(6,-3,7));
-	scalingMatrix = glm::scale(glm::vec3(1.0f, 3.0f, 1.0f));
-	rotationMatrix = glm::rotate(glm::atan(3.0f), glm::vec3(0,0,1));
-	cone2->setTransformation(translationMatrix* rotationMatrix*scalingMatrix);
+	Cone *cone2 = new Cone(highly_specular_yellow);
+	cone2->setTransformation(yellow_cone_trans);
 	objects.push_back(cone2);
 	
-	
-	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(.2)));
+	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(.4f)));
 	lights.push_back(new Light(glm::vec3(0, 1, 12), glm::vec3(0.1)));
-	lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.1)));
+	lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.2)));
 }
 
 /**
@@ -509,7 +546,7 @@ int main(int argc, const char * argv[]) {
 			glm::vec3 origin(0, 0, 0);
             glm::vec3 direction(dx, dy, dz);
             direction = glm::normalize(direction);
-            // printf("--- pixel %d, %d\n", i, j);
+
             Ray ray(origin, direction);
 
 			image.setPixel(i, j, toneMapping(trace_ray(ray)));
