@@ -45,6 +45,7 @@ struct Hit{
     float distance; ///< Distance from the origin of the ray to the intersection point
     Object *object; ///< A pointer to the intersected object
 	glm::vec2 uv; ///< Coordinates for computing the texture (texture coordinates)
+    bool from_outside;
 };
 
 Hit find_closest_hit(Ray ray);
@@ -135,6 +136,7 @@ public:
 			hit.normal = glm::normalize(hit.intersection - center);
 			hit.distance = glm::distance(ray.origin, hit.intersection);
 			hit.object = this;
+            hit.from_outside = glm::dot(ray.direction, hit.normal) <= 0;
 			
 			hit.uv.s = (asin(hit.normal.y) + M_PI/2)/M_PI;
 			hit.uv.t = (atan2(hit.normal.z,hit.normal.x) + M_PI) / (2*M_PI);
@@ -283,7 +285,6 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
     glm::vec3 refractive_component(0);
 
     glm::vec3 color = ambient_light * material.ambient;
-    bool from_outside = glm::dot(-view_direction, normal) <= 0 ;
 
     for(int light_num = 0; light_num < lights.size(); light_num++){
 
@@ -317,48 +318,9 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
         color += lights[light_num]->color * (diffuse + specular) / r/r;
     }
 
-    if (material.refractiveness > 0){
-        float index = from_outside ? material.refractiveness : 1 / material.refractiveness;
-        // cout << "ray direction " << glm::to_string(-view_direction) << endl;
-        // cout << "normal " << glm::to_string(normal) << endl;
-
-        // if (from_outside)
-        //     cout << "from outside" << endl;
-        // else
-        //     cout << "from inside" << endl;
-
-        // glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
-        glm::vec3 refraction_direction = refract(-view_direction, normal, index);
-
-        Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
-        // cout << "our's " << glm::to_string(refraction_direction) << endl;
-        // cout << "glm's " << glm::to_string(glm::refract(-view_direction, normal, material.refractiveness)) << endl << endl;
-
-        // TODO: should we keep the values of the phong model like in the line below?
-        // color = 0.5f * color + trace_ray(refraction_ray);
-        color = trace_ray(refraction_ray);
-        
-        // if (!from_outside)
-        //     return color;
-        //
-        // glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
-        // Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
-        // glm::vec3 relfective_component = material.reflectiveness > 0 ? trace_ray(reflective_ray) : glm::vec3(0);
-        //
-        // return (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component) ;
-    }
-
     color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
-    glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
-    Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
 
-    glm::vec3 relfective_component(0);
-    if (from_outside) // this guard is because since a refracting object is also
-                      // relfecting (Frensel effect), 
-        relfective_component = material.reflectiveness > 0 ? trace_ray(reflective_ray) : glm::vec3(0);
-    // glm::vec3 relfective_component = glm::vec3(0);
-
-    return (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component) ;
+    return color;
 }
 
 Hit find_closest_hit(Ray ray) {
@@ -383,43 +345,44 @@ Hit find_closest_hit(Ray ray) {
  */
 glm::vec3 trace_ray(Ray ray){
 
-	Hit closest_hit = find_closest_hit(ray);
+    Hit closest_hit = find_closest_hit(ray);
 
-	glm::vec3 color(0.0);
+    glm::vec3 color(0.0);
 
-	if(closest_hit.hit){
-		Material material = closest_hit.object->getMaterial();
-        glm::vec3 view_direction = glm::vec3(-ray.direction);
-        glm::vec3 normal = closest_hit.normal;
-        glm::vec3 point = closest_hit.intersection;
+    if(!closest_hit.hit)
+        return color;
 
-    #if 0
-        if (material.refractiveness > 0){
-            bool from_outside = glm::dot(-view_direction, normal) <= 0 ;
-            float index = from_outside ? material.refractiveness : 1 / material.refractiveness;
-            cout << "ray direction " << glm::to_string(-view_direction) << endl;
-            cout << "normal " << glm::to_string(normal) << endl;
+    color = PhongModel(closest_hit.intersection, closest_hit.normal, closest_hit.uv, glm::normalize(-ray.direction), closest_hit.object->getMaterial());
 
-            if (from_outside)
-                cout << "from outside" << endl;
-            else
-                cout << "from inside" << endl;
+    Material material = closest_hit.object->getMaterial();
+    glm::vec3 view_direction = glm::vec3(-ray.direction);
+    glm::vec3 normal = closest_hit.normal;
+    glm::vec3 point = closest_hit.intersection;
 
-            // glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
-            glm::vec3 refraction_direction = refract(-view_direction, normal, index);
+    if (material.refractiveness > 0){
+        float index = closest_hit.from_outside ? material.refractiveness : 1 / material.refractiveness;
 
-            Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
-            cout << "refraction direction " << glm::to_string(refraction_direction) << endl;
-            color = trace_ray(refraction_ray);
-        }
-        else
-#endif
+        // glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
+        glm::vec3 refraction_direction = refract(-view_direction, normal, index);
 
-        color = PhongModel(closest_hit.intersection, closest_hit.normal, closest_hit.uv, glm::normalize(-ray.direction), closest_hit.object->getMaterial());
-	}else{
-		color = glm::vec3(0.0, 0.0, 0.0);
-	}
-	return color;
+        Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
+        // cout << "our refraction" << glm::to_string(refraction_direction) << endl;
+        // cout << "glm refraction" << glm::to_string(glm::refract(-view_direction, normal, index)) << endl << endl;
+        color = trace_ray(refraction_ray);
+    }
+
+    if (material.reflectiveness > 0){
+        glm::vec3 relfective_component(0);
+        glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
+        Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
+
+        if (closest_hit.from_outside) // this guard is because since a refracting object is also
+                          // relfecting (Frensel effect), 
+            relfective_component = trace_ray(reflective_ray);
+        color = (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component);
+    }
+
+    return color;
 }
 /**
  Function defining the scene
