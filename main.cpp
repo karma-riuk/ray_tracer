@@ -263,6 +263,14 @@ vector<Light *> lights; ///< A list of lights in the scene
 glm::vec3 ambient_light(0.001,0.001,0.001);
 vector<Object *> objects; ///< A list of all objects in the scene
 
+glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index){
+    glm::vec3 a = n * glm::dot(i, n);
+    glm::vec3 b = i - a;
+    float beta = 1/index;
+    float alpha = sqrt(1 + (1 - pow(beta, 2)) * (glm::dot(b, b) / glm::dot(a, a)));
+    return alpha * a + beta * b;
+}
+
 
 /** Function for computing color of an object according to the Phong Model
  @param point A point belonging to the object for which the color is computer
@@ -272,47 +280,85 @@ vector<Object *> objects; ///< A list of all objects in the scene
  @param material A material structure representing the material of the object
 */
 glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 view_direction, Material material){
-	glm::vec3 refractive_component(0);
+    glm::vec3 refractive_component(0);
 
-	glm::vec3 color = ambient_light * material.ambient;
-	for(int light_num = 0; light_num < lights.size(); light_num++){
-		
-		glm::vec3 light_position = lights[light_num]->position;
-		glm::vec3 light_direction = glm::normalize(light_position - point);
-		Ray light_ray(point + (EPS * light_direction), light_direction);
-		Hit closest_hit = find_closest_hit(light_ray);
-		if (closest_hit.distance < glm::distance(point, light_position)) 
-			continue;
-		glm::vec3 reflected_direction = glm::reflect(-light_direction, normal);
+    glm::vec3 color = ambient_light * material.ambient;
+    bool from_outside = glm::dot(-view_direction, normal) <= 0 ;
 
-		float NdotL = glm::clamp(glm::dot(normal, light_direction), 0.0f, 1.0f);
-		float VdotR = glm::clamp(glm::dot(view_direction, reflected_direction), 0.0f, 1.0f);
+    for(int light_num = 0; light_num < lights.size(); light_num++){
 
-		
-		glm::vec3 diffuse_color = material.diffuse;
-		if(material.texture){
-			diffuse_color = material.texture(uv);
-		}
-		
-		glm::vec3 diffuse = diffuse_color * glm::vec3(NdotL);
-		glm::vec3 specular = material.specular * glm::vec3(pow(VdotR, material.shininess));
-		
-		
-		// distance to the light
-		float r = glm::distance(point,lights[light_num]->position);
-		r = max(r, 0.1f);
-		
-		color += lights[light_num]->color * (diffuse + specular) / r/r;
-	}
-	
-	
-	color += refractive_component;
-	color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
-	glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
-	Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
-	glm::vec3 relfective_component = material.reflectiveness > 0 ? trace_ray(reflective_ray) : glm::vec3(0);
-	
-	return (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component) ;
+        glm::vec3 light_position = lights[light_num]->position;
+        glm::vec3 light_direction = glm::normalize(light_position - point);
+        Ray light_ray(point + (EPS * light_direction), light_direction);
+        Hit closest_hit = find_closest_hit(light_ray);
+        // TODO: missing the fact that refracting objects can let light through,
+        // so there wouldn't be a complete shadow
+        if (closest_hit.distance < glm::distance(point, light_position)) 
+            continue;
+        glm::vec3 reflected_direction = glm::reflect(-light_direction, normal);
+
+        float NdotL = glm::clamp(glm::dot(normal, light_direction), 0.0f, 1.0f);
+        float VdotR = glm::clamp(glm::dot(view_direction, reflected_direction), 0.0f, 1.0f);
+
+
+        glm::vec3 diffuse_color = material.diffuse;
+        if(material.texture){
+            diffuse_color = material.texture(uv);
+        }
+
+        glm::vec3 diffuse = diffuse_color * glm::vec3(NdotL);
+        glm::vec3 specular = material.specular * glm::vec3(pow(VdotR, material.shininess));
+
+
+        // distance to the light
+        float r = glm::distance(point,lights[light_num]->position);
+        r = max(r, 0.1f);
+
+        color += lights[light_num]->color * (diffuse + specular) / r/r;
+    }
+
+    if (material.refractiveness > 0){
+        float index = from_outside ? material.refractiveness : 1 / material.refractiveness;
+        // cout << "ray direction " << glm::to_string(-view_direction) << endl;
+        // cout << "normal " << glm::to_string(normal) << endl;
+
+        // if (from_outside)
+        //     cout << "from outside" << endl;
+        // else
+        //     cout << "from inside" << endl;
+
+        // glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
+        glm::vec3 refraction_direction = refract(-view_direction, normal, index);
+
+        Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
+        // cout << "our's " << glm::to_string(refraction_direction) << endl;
+        // cout << "glm's " << glm::to_string(glm::refract(-view_direction, normal, material.refractiveness)) << endl << endl;
+
+        // TODO: should we keep the values of the phong model like in the line below?
+        // color = 0.5f * color + trace_ray(refraction_ray);
+        color = trace_ray(refraction_ray);
+        
+        // if (!from_outside)
+        //     return color;
+        //
+        // glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
+        // Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
+        // glm::vec3 relfective_component = material.reflectiveness > 0 ? trace_ray(reflective_ray) : glm::vec3(0);
+        //
+        // return (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component) ;
+    }
+
+    color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
+    glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
+    Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
+
+    glm::vec3 relfective_component(0);
+    if (from_outside) // this guard is because since a refracting object is also
+                      // relfecting (Frensel effect), 
+        relfective_component = material.reflectiveness > 0 ? trace_ray(reflective_ray) : glm::vec3(0);
+    // glm::vec3 relfective_component = glm::vec3(0);
+
+    return (1 - material.reflectiveness) * color + (material.reflectiveness * relfective_component) ;
 }
 
 Hit find_closest_hit(Ray ray) {
@@ -323,20 +369,12 @@ Hit find_closest_hit(Ray ray) {
 
 	for(int k = 0; k<objects.size(); k++){
 		Hit hit = objects[k]->intersect(ray);
-		if(hit.hit == true && hit.distance < closest_hit.distance)
+		if(hit.hit == true && hit.distance > 0.01f && hit.distance < closest_hit.distance)
 			closest_hit = hit;
 	}
 	return closest_hit;
 }
 
-
-glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index){
-    glm::vec3 a = n * glm::dot(i, n);
-    glm::vec3 b = i - a;
-    float beta = 1/index;
-    float alpha = sqrt(1 + (1 - pow(beta, 2)) * (glm::dot(b, b) / glm::dot(a, a)));
-    return alpha * a + beta * b;
-}
 
 /**
  Functions that computes a color along the ray
@@ -351,27 +389,33 @@ glm::vec3 trace_ray(Ray ray){
 
 	if(closest_hit.hit){
 		Material material = closest_hit.object->getMaterial();
-		if (material.refractiveness > 0){
-			bool from_outside = glm::dot(ray.direction, closest_hit.normal) <= 0 ;
-			float index = from_outside ? material.refractiveness : 1 / material.refractiveness;
-			cout << "ray direction " << glm::to_string(ray.direction) << endl;
-			cout << "normal " << glm::to_string(closest_hit.normal) << endl;
-			
-			if (from_outside)
-				cout << "from outside" << endl;
-			else
-				cout << "from inside" << endl;
+        glm::vec3 view_direction = glm::vec3(-ray.direction);
+        glm::vec3 normal = closest_hit.normal;
+        glm::vec3 point = closest_hit.intersection;
 
-			// glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
-			glm::vec3 refraction_direction = refract(ray.direction, closest_hit.normal, index);
+    #if 0
+        if (material.refractiveness > 0){
+            bool from_outside = glm::dot(-view_direction, normal) <= 0 ;
+            float index = from_outside ? material.refractiveness : 1 / material.refractiveness;
+            cout << "ray direction " << glm::to_string(-view_direction) << endl;
+            cout << "normal " << glm::to_string(normal) << endl;
 
-			Ray refraction_ray(closest_hit.intersection + ( refraction_direction), refraction_direction);
+            if (from_outside)
+                cout << "from outside" << endl;
+            else
+                cout << "from inside" << endl;
+
+            // glm::vec3 refraction_direction = glm::refract(ray.direction, closest_hit.normal, index);
+            glm::vec3 refraction_direction = refract(-view_direction, normal, index);
+
+            Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
             cout << "refraction direction " << glm::to_string(refraction_direction) << endl;
             color = trace_ray(refraction_ray);
-		} else {
-			// cout << "omg the end" << endl;
-			color = PhongModel(closest_hit.intersection, closest_hit.normal, closest_hit.uv, glm::normalize(-ray.direction), closest_hit.object->getMaterial());
-		}
+        }
+        else
+#endif
+
+        color = PhongModel(closest_hit.intersection, closest_hit.normal, closest_hit.uv, glm::normalize(-ray.direction), closest_hit.object->getMaterial());
 	}else{
 		color = glm::vec3(0.0, 0.0, 0.0);
 	}
@@ -400,13 +444,17 @@ void sceneDefinition (){
 	blue_specular.shininess = 100.0;
 
 	Material refractive;
-	refractive.reflectiveness = .2f;
+	refractive.ambient = glm::vec3(0.02f, 0.02f, 0.1f);
+	refractive.diffuse = glm::vec3(0.2f, 0.2f, 1.0f);
+	refractive.specular = glm::vec3(0.6);
+	refractive.reflectiveness = .1f; // TODO: prolly not right
 	refractive.refractiveness = 2.0f;
 
 
 	objects.push_back(new Sphere(1.0, glm::vec3(1,-2,8), blue_specular));
 	objects.push_back(new Sphere(0.5, glm::vec3(-1,-2.5,6), red_specular));
 	objects.push_back(new Sphere(2.0, glm::vec3(-3,-1, 8), refractive));
+	// objects.push_back(new Sphere(2.0, glm::vec3(-3,1, 8), refractive));
 	//objects.push_back(new Sphere(1.0, glm::vec3(3,-2,6), green_diffuse));
 	
 	
@@ -456,9 +504,9 @@ void sceneDefinition (){
 	objects.push_back(cone2);
 	
 	
-	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(1.0, 1.0, 1.0)));
+	lights.push_back(new Light(glm::vec3(0, 26, 5), glm::vec3(.2)));
 	lights.push_back(new Light(glm::vec3(0, 1, 12), glm::vec3(0.1)));
-	lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.4)));
+	lights.push_back(new Light(glm::vec3(0, 5, 1), glm::vec3(0.1)));
 }
 
 /**
@@ -498,7 +546,7 @@ int main(int argc, const char * argv[]) {
 			glm::vec3 origin(0, 0, 0);
             glm::vec3 direction(dx, dy, dz);
             direction = glm::normalize(direction);
- cout << endl;
+            // printf("--- pixel %d, %d\n", i, j);
             Ray ray(origin, direction);
 
 			image.setPixel(i, j, toneMapping(trace_ray(ray)));
