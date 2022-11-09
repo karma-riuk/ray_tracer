@@ -9,3 +9,4 @@ main
 main.dSYM
 *.o
 .vscode/
+*.synctex.gz

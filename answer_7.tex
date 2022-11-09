@@ -104,14 +104,14 @@ Finally, we color $(9, 5)$ because it is $p'_2$.
 
 \begin{itemize}
 	\item The z-value of the horizontal midpoint $(6, 6)$ has vertical
-	      barycentric coordinate $\lambda = \frac{1}{3}$ (formula taken from slide
+	      barycentric coordinate $\lambda = \frac{1}{2}$ (formula taken from slide
 	      9 of "11 - Perspective Interpolation")
 	      \begin{align*}
 		      p^z & = \frac{1}{ (1-\lambda)  \frac{1}{p_1^z} + \lambda \frac{1}{p_2^z} } \\
-		          & = \frac{1}{ (1- \frac{1}{3})  \frac{1}{2} + \frac{1}{3} \frac{1}{10}
+		          & = \frac{1}{ (1- \frac{1}{2})  \frac{1}{2} + \frac{1}{2} \frac{1}{10}
 		      }                                                                          \\
-		          & = \frac{1}{ \frac{6}{30} }                                           \\
-		          & = 5
+		          & = \frac{1}{ \frac{6}{20} }                                           \\
+		          & = \frac{10}{3}
 	      \end{align*}
 
 	\item The color of the horizontal midpoint can be calculated with the
@@ -122,21 +122,21 @@ Finally, we color $(9, 5)$ because it is $p'_2$.
 	      where $A$ is the attribute (in our case the color of the pixel) of $p$.
 	      Thus
 	      \begin{align*}
-		      A & = \left(\left( 1 - \frac{1}{3} \right) \cdot
+		      A & = \left(\left( 1 - \frac{1}{2} \right) \cdot
 		      \begin{pmatrix} 1\\ 0\\ 0 \end{pmatrix}
-		      \cdot \frac{1}{2} + \frac{1}{3} \cdot
+		      \cdot \frac{1}{2} + \frac{1}{2} \cdot
 		      \begin{pmatrix} 0\\ 1\\0 \end{pmatrix}
-		      \cdot \frac{1}{10} \right) \cdot 5 =             \\
+		      \cdot \frac{1}{10} \right) \cdot \frac{10}{3} =             \\
 		        & = \left(
-		      \begin{pmatrix} \frac{1}{3} \\ 0 \\ 0 \end{pmatrix}
+		      \begin{pmatrix} \frac{1}{4} \\ 0 \\ 0 \end{pmatrix}
 		      +
-		      \begin{pmatrix} 0 \\ \frac{1}{30} \\ 0 \end{pmatrix}
-		      \right) \cdot 5                                  \\
+		      \begin{pmatrix} 0 \\ \frac{1}{20} \\ 0 \end{pmatrix}
+		      \right) \cdot \frac{10}{3}                                  \\
 		        & =
-		      \begin{pmatrix} 1/3 \\ 1/30 \\ 0 \end{pmatrix}
-		      \cdot 5                                          \\
+		      \begin{pmatrix} 1/4 \\ 1/20 \\ 0 \end{pmatrix}
+		      \cdot \frac{10}{3}                                          \\
 		        & =
-		      \begin{pmatrix} 5/3 \\ 1/6 \\ 0 \end{pmatrix}
+		      \begin{pmatrix} 5/6 \\ 1/6 \\ 0 \end{pmatrix}
 	      \end{align*}
 
 \end{itemize}
