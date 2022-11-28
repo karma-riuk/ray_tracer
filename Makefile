@@ -1,7 +1,7 @@
 CXXFLAGS = -Wall -O3
-OBJS = Textures.o Image.o
-GROUP = f
-ASS = 5
+OBJS = Textures.o Image.o lib/lodepng/lodepng.o
+GROUP = d
+ASS = 10
 .PHONY: clean zip
 
 asdf: main

@@ -11,6 +11,7 @@
 #include "glm/gtx/transform.hpp"
 #include "glm/gtx/string_cast.hpp"
 
+#include "lib/lodepng/lodepng.h"
 #include "Image.h"
 #include "Material.h"
 
