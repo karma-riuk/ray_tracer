@@ -31,12 +31,8 @@ class ImageTexture : public Texture {
     PNG_Image_t &base_color, &height_map, &normals, &ambient_occlusion, &roughness;
 
   public:
-    ImageTexture(
-            PNG_Image_t & base_color, 
-            PNG_Image_t & height_map, 
-            PNG_Image_t & normals,
-                 PNG_Image_t & ambient_occlusion, 
-                 PNG_Image_t & roughness)
+    ImageTexture(PNG_Image_t & base_color, PNG_Image_t & height_map, PNG_Image_t & normals,
+                 PNG_Image_t & ambient_occlusion, PNG_Image_t & roughness)
         : base_color(base_color), height_map(height_map), normals(normals),
           ambient_occlusion(ambient_occlusion), roughness(roughness) {}
     virtual glm::vec3 texture(glm::vec2 uv);
