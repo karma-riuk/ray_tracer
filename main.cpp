@@ -147,7 +147,7 @@ public:
         hit.intersection = i;
         hit.normal = i;
         hit.uv.x = (asin(i.y) + M_PI/2)/M_PI;
-        hit.uv.y = (atan2(i.z, i.x) + M_PI)/(2*M_PI);
+        hit.uv.y = (atan2(i.z, i.x) + M_PI)/M_PI;
 
         bool from_inside = glm::all(glm::lessThan(glm::abs(o), glm::vec3(1)));
         hit.from_outside = !from_inside;
@@ -327,7 +327,10 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
 
         glm::vec3 diffuse_color = material.diffuse;
         if(material.texture){
-            diffuse_color = material.texture(uv);
+            if (material.image != NULL)
+                diffuse_color = material.texture(uv, material.image);
+            else 
+                diffuse_color = material.texture(uv, NULL);
         }
 
         glm::vec3 diffuse = diffuse_color * glm::vec3(NdotL);
@@ -407,6 +410,35 @@ glm::vec3 trace_ray(Ray ray){
 
     return color;
 }
+
+//Decode from disk to raw pixels with a single function call
+PNG_Image_t * decodeOneStep(const char* filename) {
+  std::vector<unsigned char> data; //the raw pixels
+  unsigned width, height;
+
+  //decode
+  unsigned error = lodepng::decode(data, width, height, filename);
+
+  //if there's an error, display it
+  if(error) {
+      std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+      return 0;
+  }
+
+  PNG_Image_t * image = (PNG_Image_t *) malloc(sizeof(PNG_Image_t));
+  if (!image)
+      return 0;
+  printf("png image: %dx%d", width, height);
+  *image =  {
+      .width = width,
+      .height = height,
+      .data = data,
+  };
+
+  //the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as texture, draw it, ...
+  return image;
+}
+
 /**
  Function defining the scene
  */
@@ -445,22 +477,23 @@ void sceneDefinition (){
 
     Sphere * refractive_sphere = new Sphere(refractive);
     refractive_sphere->setTransformation(glm::translate(glm::vec3(-3, -1, 8)) * glm::scale(glm::vec3(2)));
-	objects.push_back(refractive_sphere);
-	
+	// objects.push_back(refractive_sphere);
 	
 	
 	
 	
 	//Textured sphere
 	Material textured;
-	textured.texture = &rainbowTexture;
-    Sphere * rainbow_sphere = new Sphere(textured);
+	// textured.texture = &rainbowTexture;
+	textured.texture = &imageTexture;
+    textured.image = decodeOneStep("./textures/png/Waffle_001_basecolor.png");
+    Sphere * waffle_sphere = new Sphere(textured);
     // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f, glm::vec3(0, 1, 0)));
-    glm::mat4 translation = glm::translate(glm::vec3(-6,4,23));
+    glm::mat4 translation = glm::translate(glm::vec3(-6,4,21));
     glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
     glm::mat4 scaling = glm::scale(glm::vec3(7));
-    rainbow_sphere->setTransformation(translation * rotation * scaling);
-	objects.push_back(rainbow_sphere);
+    waffle_sphere->setTransformation(translation * rotation * scaling);
+	objects.push_back(waffle_sphere);
 	
 	
 	//Planes
@@ -521,6 +554,7 @@ glm::vec3 toneMapping(glm::vec3 intensity){
 	return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), glm::vec3(0.0), glm::vec3(1.0));
 }
 
+
 int main(int argc, const char * argv[]) {
 
     clock_t t = clock(); // variable for keeping the time of the rendering
@@ -567,3 +601,4 @@ int main(int argc, const char * argv[]) {
 
     return 0;
 }
+
