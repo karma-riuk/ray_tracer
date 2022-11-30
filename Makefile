@@ -1,5 +1,7 @@
 CXXFLAGS = -Wall -O3
-OBJS = Textures.o Image.o lib/lodepng/lodepng.o
+SOURCE_FILES = Textures.cpp Image.cpp lib/lodepng/lodepng.cpp
+OBJS = $(SOURCE_FILES:%.cpp=objects/%.o)
+
 GROUP = d
 ASS = 10
 .PHONY: clean zip
@@ -10,8 +12,15 @@ asdf: main
 
 main: $(OBJS)
 
+$(OBJS): objects/%.o: %.h
+
+$(OBJS): objects/%.o: %.cpp
+	@echo "Compiling" $<
+	@mkdir -p $(@D)
+	@gcc $(CFLAGS) $(CXXFLAGS) -c -o $@ $<
+
 clean:
-	-rm -f *.o
+	-rm -f $(OBJS)
 	-rm main
 
 zip: 
