@@ -142,7 +142,7 @@ public:
 
         float t;
         t = min(t_1 < 0 ? INFINITY: t_1, t_2 < 0 ? INFINITY: t_2); // find lowest positive number 
-                                                                   //
+
         glm::vec3 i = o + t * d;
         hit.intersection = i;
         hit.normal = i;
@@ -326,12 +326,8 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
 
 
         glm::vec3 diffuse_color = material.diffuse;
-        if(material.texture){
-            if (material.image != NULL)
-                diffuse_color = material.texture(uv, material.image);
-            else 
-                diffuse_color = material.texture(uv, NULL);
-        }
+        if(material.texture)
+            diffuse_color = material.texture->texture(uv);
 
         glm::vec3 diffuse = diffuse_color * glm::vec3(NdotL);
         glm::vec3 specular = material.specular * glm::vec3(pow(VdotR, material.shininess));
@@ -485,8 +481,14 @@ void sceneDefinition (){
 	//Textured sphere
 	Material textured;
 	// textured.texture = &rainbowTexture;
-	textured.texture = &imageTexture;
-    textured.image = decodeOneStep("./textures/png/Waffle_001_basecolor.png");
+    Texture * imageTexture = new ImageTexture(
+            *decodeOneStep("./textures/png/Waffle_001_basecolor.png"),
+            *decodeOneStep("./textures/png/Waffle_001_height.png"),
+            *decodeOneStep("./textures/png/Waffle_001_normals.png"),
+            *decodeOneStep("./textures/png/Waffle_001_ambientOcclusion.png"),
+            *decodeOneStep("./textures/png/Waffle_001_roughness.png")
+            );
+    textured.texture = imageTexture;
     Sphere * waffle_sphere = new Sphere(textured);
     // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f, glm::vec3(0, 1, 0)));
     glm::mat4 translation = glm::translate(glm::vec3(-6,4,21));

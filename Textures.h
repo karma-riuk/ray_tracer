@@ -20,10 +20,33 @@ typedef struct PNG_Image {
     std::vector<unsigned char> data;
 } PNG_Image_t;
 
+class Texture {
 
-glm::vec3 checkerboardTexture(glm::vec2 uv, PNG_Image_t * image);
-glm::vec3 rainbowTexture(glm::vec2 uv, PNG_Image_t * image);
-glm::vec3 imageTexture( glm::vec2 uv, PNG_Image_t * image);
+  public:
+    Texture(){};
+    virtual glm::vec3 texture(glm::vec2 uv) = 0;
+};
 
+class ImageTexture : public Texture {
+    PNG_Image_t &base_color, &height_map, &normals, &ambient_occlusion, &roughness;
 
+  public:
+    ImageTexture(
+            PNG_Image_t & base_color, 
+            PNG_Image_t & height_map, 
+            PNG_Image_t & normals,
+                 PNG_Image_t & ambient_occlusion, 
+                 PNG_Image_t & roughness)
+        : base_color(base_color), height_map(height_map), normals(normals),
+          ambient_occlusion(ambient_occlusion), roughness(roughness) {}
+    virtual glm::vec3 texture(glm::vec2 uv);
+};
+
+class RainbowTexture : public Texture {
+    virtual glm::vec3 texture(glm::vec2 uv);
+};
+
+class CheckerBoardTexture : public Texture {
+    virtual glm::vec3 texture(glm::vec2 uv);
+};
 #endif /* Textures_h */

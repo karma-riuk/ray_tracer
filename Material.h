@@ -21,8 +21,7 @@ struct Material{
     float shininess = 0.0;
     float reflectiveness = 0.0;
     float refractiveness = 0.0;
-    glm::vec3 (* texture)(glm::vec2 uv, PNG_Image_t * image) = NULL;
-    PNG_Image_t * image = NULL;
+    Texture * texture = nullptr;
 };
 
 #endif /* Material_h */
