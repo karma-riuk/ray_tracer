@@ -24,4 +24,4 @@ clean:
 	-rm main
 
 zip: 
-	zip -r group_$(GROUP)_assignment_$(ASS).zip main.cpp Textures.h Textures.cpp Image.h Image.cpp
+	zip -r group_$(GROUP)_assignment_$(ASS).zip main.cpp Textures.h Textures.cpp Image.h Image.cpp lib objects result.ppm textures
