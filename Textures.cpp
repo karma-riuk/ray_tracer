@@ -23,19 +23,33 @@ glm::vec3 RainbowTexture::texture(glm::vec2 uv) {
     }
 }
 
+// returns a vec4 of numbers in [0; 1] representing RGBA values
+glm::vec4 ImageTexture::getRGBAat(glm::vec2 uv, PNG_Image_t & image) {
+    int x = (int)(round(TEXTURE_REPETITION * uv.x * image.width)) % (image.width);
+    int y = (int)(round(TEXTURE_REPETITION * uv.y * image.height)) % (image.height);
+    int index = (y * image.width + x) * 4;
+
+    // printf("%d, %d, %d, %d\n", image.data[index + 0], image.data[index + 1], image.data[index + 2], image.data[index + 3]);
+    return glm::vec4((float)image.data[index + 0], (float)image.data[index + 1],
+                     (float)image.data[index + 2], (float)image.data[index + 3]) / 255.f;
+}
+
 // image is the result of reading the png file, it contains 3 fields:
 // - the width and height of the image (number of pixels)
 // - a one dimentional vector containing the color of the pixels in format RBGA RGBA ...
 // (hence the length of the vector is 4 * width * height)
 glm::vec3 ImageTexture::texture(glm::vec2 uv) {
-    int x =
-        (int)(round(TEXTURE_REPETITION * uv.x * this->base_color.width)) % (this->base_color.width);
-    int y = (int)(round(TEXTURE_REPETITION * uv.y * this->base_color.height)) %
-            (this->base_color.height);
-    int index = (y * this->base_color.width + x) * 4;
+    return ImageTexture::getRGBAat(uv, this->base_color);
+}
 
-    glm::vec3 ret = glm::vec3((float)this->base_color.data[index + 0] / 255,
-                              (float)this->base_color.data[index + 1] / 255,
-                              (float)this->base_color.data[index + 2] / 255);
-    return ret;
+glm::vec3 ImageTexture::normal(glm::vec2 uv) {
+    return ImageTexture::getRGBAat(uv, this->normals_map);
+}
+
+glm::vec3 ImageTexture::occlusion(glm::vec2 uv) {
+    return ImageTexture::getRGBAat(uv, this->ambient_occlusion_map);
+}
+
+float ImageTexture::roughness(glm::vec2 uv) {
+    return ImageTexture::getRGBAat(uv, this->roughness_map).x;
 }
