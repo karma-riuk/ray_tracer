@@ -87,8 +87,8 @@ class Object {
     }
 };
 
-template <class DstType, class SrcType> bool isType(const SrcType* src) {
-  return dynamic_cast<const DstType*>(src) != nullptr;
+template <class DstType, class SrcType> bool isType(const SrcType * src) {
+    return dynamic_cast<const DstType *>(src) != nullptr;
 }
 
 /**
@@ -153,16 +153,13 @@ class Sphere : public Object {
         hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
 
         if (isType<ImageTexture>(material.texture)) {
-            glm::vec3 tangent = glm::vec3(
-                    sin(hit.uv.x),
-                    0,
-                    cos(hit.uv.y)
-                    );
+            glm::vec3 tangent = glm::vec3(sin(hit.uv.x), 0, cos(hit.uv.y));
             glm::vec3 bitangent = glm::cross(hit.normal, tangent);
 
-            glm::mat3 tbn(glm::normalize(tangent), glm::normalize(bitangent), glm::normalize(hit.normal));
+            glm::mat3 tbn(glm::normalize(tangent), glm::normalize(bitangent),
+                          glm::normalize(hit.normal));
 
-            ImageTexture * texture = (ImageTexture *) material.texture;
+            ImageTexture * texture = (ImageTexture *)material.texture;
             glm::vec3 tmp_normal = texture->normal(hit.uv);
             tmp_normal = (2.f * tmp_normal) - glm::vec3(1);
             tmp_normal = tbn * tmp_normal;
@@ -280,6 +277,64 @@ class Cone : public Object {
     }
 };
 
+class Triangle : public Object {
+
+  private:
+    glm::vec3 p1, p2, p3;
+    glm::vec3 n1, n2, n3;
+
+  public:
+    Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3,
+             Material material)
+        : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {
+        this->material = material;
+    }
+    Hit intersect(Ray ray) {
+        Hit hit;
+        hit.hit = false;
+
+        glm::vec3 sn = glm::cross(p2 - p1, p3 - p1);
+        Plane plane_from_triangle(p1, sn);
+        Hit plane_hit = plane_from_triangle.intersect(ray);
+        if (!plane_hit.hit)
+            return hit;
+
+        glm::vec3 p = plane_hit.intersection;
+        int sw1, sw2, sw3;
+        glm::vec3 sn1, sn2, sn3; // normals for barycentric coords
+        sn1 = glm::cross(p2 - p, p3 - p);
+        sn2 = glm::cross(p3 - p, p1 - p);
+        sn3 = glm::cross(p1 - p, p2 - p);
+
+        float sign1, sign2, sign3;
+        sign1 = glm::sign(glm::dot(sn1, sn));
+        sign2 = glm::sign(glm::dot(sn2, sn));
+        sign3 = glm::sign(glm::dot(sn3, sn));
+        // printf("sign 1: %f, sign 2: %f, sign 2: %f...", sign1, sign2, sign3);
+        if (sign1 < 0 || sign2 < 0 || sign3 < 0) {
+            // printf("aborted\n");
+            return hit; // not hit
+        }
+
+        hit.hit = true;
+        hit.intersection = p;
+
+        // cout << endl << glm::to_string(p) << endl;
+
+        // cout << glm::to_string(n1) << endl;
+        hit.normal = glm::normalize(length(sn1) * n1 + length(sn2) * n2 + length(sn3) * n3);
+        cout << glm::to_string(hit.normal) << endl;
+        hit.distance = plane_hit.distance;
+        hit.object = this;
+        float W = length(sn);
+        hit.uv = glm::vec2(length(sn1) / W, length(sn2) / W);
+        // hit.from_outside = dot(hit.normal, ray.direction) < 0;
+        hit.from_outside = true;
+
+        return hit;
+    }
+};
+
 /**
  Light class
  */
@@ -340,12 +395,11 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
         glm::vec3 diffuse = diffuse_color * glm::vec3(NdotL);
         float shininess = material.shininess;
 
-
-        if (isType<ImageTexture>(material.texture)){
-            ImageTexture * texture = (ImageTexture *) material.texture;
+        if (isType<ImageTexture>(material.texture)) {
+            ImageTexture * texture = (ImageTexture *)material.texture;
             // cout << "before " << shininess << endl;
             diffuse *= texture->occlusion(uv);
-            shininess = .5/pow(texture->roughness(uv), 4)-.5;
+            shininess = .5 / pow(texture->roughness(uv), 4) - .5;
             // shininess = glm::clamp(shininess, 0.f, 1.f);
             // cout << "after " << shininess << endl;
         }
@@ -465,8 +519,8 @@ void sceneDefinition() {
     green_diffuse.diffuse = glm::vec3(0.3f, 1.0f, 0.3f);
 
     Material red_specular;
-    red_specular.diffuse = glm::vec3(1.0f, 0.2f, 0.2f);
     red_specular.ambient = glm::vec3(0.01f, 0.02f, 0.02f);
+    red_specular.diffuse = glm::vec3(1.0f, 0.2f, 0.2f);
     red_specular.specular = glm::vec3(0.5);
     red_specular.shininess = 10.0;
 
@@ -475,17 +529,42 @@ void sceneDefinition() {
     blue_specular.diffuse = glm::vec3(0.2f, 0.2f, 1.0f);
     blue_specular.specular = glm::vec3(0.6);
     blue_specular.shininess = 100.0;
-    blue_specular.reflectiveness = .9f;
+    // blue_specular.reflectiveness = .9f;
+
+    Material highly_specular_yellow{
+        .ambient = glm::vec3(0.1f, 0.1f, 0.03f),
+        .diffuse = glm::vec3(.6f, .6f, 0.1f),
+        .specular = glm::vec3(.6f),
+        .shininess = 100,
+    };
+
+    glm::vec3 p1(0, 2, 10), p2(-4, 2, 17), p3(4, 2, 17), p4(0, 8, 14);
+    glm::vec3 n1(cross(p3 - p1, p2 - p1)), n2(cross(p2 - p1, p4 - p1)), n3(cross(p4 - p1, p3 - p1)),
+        n4(cross(p4 - p3, p2 - p3));
+    n1 = glm::normalize(n1);
+    n2 = glm::normalize(n2);
+    n3 = glm::normalize(n3);
+    n4 = glm::normalize(n4);
+
+    Triangle *t1 = new Triangle(p1, p3, p2, n1, n1, n1, green_diffuse),
+             *t2 = new Triangle(p2, p4, p1, n2, n2, n2, red_specular),
+             *t3 = new Triangle(p1, p4, p3, n3, n3, n3, blue_specular),
+             *t4 = new Triangle(p3, p4, p2, n4, n4, n4, red_specular);
+
+    objects.push_back(t1);
+    objects.push_back(t2);
+    objects.push_back(t3);
+    objects.push_back(t4);
 
     Material refractive{.reflectiveness = 0.1f, .refractiveness = 2.0f};
 
     Sphere * blue_sphere = new Sphere(blue_specular);
     blue_sphere->setTransformation(glm::translate(glm::vec3(1, -2, 8)));
-    objects.push_back(blue_sphere);
+    // objects.push_back(blue_sphere);
     Sphere * red_sphere = new Sphere(red_specular);
     red_sphere->setTransformation(
         glm::scale(glm::translate(glm::vec3(-1, -2.5, 6)), glm::vec3(.5)));
-    objects.push_back(red_sphere);
+    // objects.push_back(red_sphere);
 
     Sphere * refractive_sphere = new Sphere(refractive);
     refractive_sphere->setTransformation(glm::translate(glm::vec3(-3, -1, 8)) *
@@ -495,18 +574,17 @@ void sceneDefinition() {
     // Textured sphere
     Material textured{
         .specular = glm::vec3(.6f),
-            .shininess = 100,
+        .shininess = 100,
     };
     // textured.texture = &rainbowTexture;
     PNG_Image_t * roughness = decodeOneStep("./textures/png/Waffle_001_roughness.png");
-    // printf("%d, %d, %d, %d\n", roughness->data[0], roughness->data[1], roughness->data[2], roughness->data[3]);
-    // cout << glm::to_string(glm::vec3(2) * glm::vec3(4)) << endl;
-    Texture * imageTexture =
-        new ImageTexture(*decodeOneStep("./textures/png/Waffle_001_basecolor.png"),
-                         *decodeOneStep("./textures/png/Waffle_001_height.png"), 
-                         *decodeOneStep("./textures/png/Waffle_001_normal.png"),
-                         *decodeOneStep("./textures/png/Waffle_001_ambientOcclusion.png"),
-                         *roughness);
+    // printf("%d, %d, %d, %d\n", roughness->data[0], roughness->data[1], roughness->data[2],
+    // roughness->data[3]); cout << glm::to_string(glm::vec3(2) * glm::vec3(4)) << endl;
+    Texture * imageTexture = new ImageTexture(
+        *decodeOneStep("./textures/png/Waffle_001_basecolor.png"),
+        *decodeOneStep("./textures/png/Waffle_001_height.png"),
+        *decodeOneStep("./textures/png/Waffle_001_normal.png"),
+        *decodeOneStep("./textures/png/Waffle_001_ambientOcclusion.png"), *roughness);
     textured.texture = imageTexture;
     Sphere * waffle_sphere = new Sphere(textured);
     // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f,
@@ -515,7 +593,7 @@ void sceneDefinition() {
     glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
     glm::mat4 scaling = glm::scale(glm::vec3(7));
     waffle_sphere->setTransformation(translation * rotation * scaling);
-    objects.push_back(waffle_sphere);
+    // objects.push_back(waffle_sphere);
 
     // Planes
     Material red_diffuse;
@@ -538,14 +616,7 @@ void sceneDefinition() {
 
     Cone * cone1 = new Cone(green_diffuse);
     cone1->setTransformation(green_cone_trans);
-    objects.push_back(cone1);
-
-    Material highly_specular_yellow{
-        .ambient = glm::vec3(0.1f, 0.1f, 0.03f),
-        .diffuse = glm::vec3(.6f, .6f, 0.1f),
-        .specular = glm::vec3(.6f),
-        .shininess = 100,
-    };
+    // objects.push_back(cone1);
 
     glm::mat4 yellow_cone_trans =
         glm::scale(glm::translate(glm::vec3(5, 9, 14)) * glm::rotate(3.1415f, glm::vec3(0, 0, 1)),
@@ -553,7 +624,7 @@ void sceneDefinition() {
 
     Cone * cone2 = new Cone(highly_specular_yellow);
     cone2->setTransformation(yellow_cone_trans);
-    objects.push_back(cone2);
+    // objects.push_back(cone2);
 
     lights.push_back(new Light(glm::vec3(0, 20, 5), glm::vec3(.4f)));
     lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
