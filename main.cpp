@@ -9,11 +9,15 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <vector>
 
 #include "Image.h"
 #include "Material.h"
 #include "lib/lodepng/lodepng.h"
+#include "obj_reader.h"
+
+using std::stringstream;
 
 using namespace std;
 #define EPS 0.0001f
@@ -284,11 +288,24 @@ class Triangle : public Object {
     glm::vec3 n1, n2, n3;
 
   public:
+    Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) : p1(p1), p2(p2), p3(p3) {
+        n1 = n2 = n3 = glm::normalize(cross(p3 - p1, p2 - p1));
+    }
+
+    Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3)
+        : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {}
     Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3,
              Material material)
         : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {
         this->material = material;
     }
+
+    void set_normals(glm::vec3 n1, glm::vec3 n2, glm::vec3 n3) {
+        this->n1 = n1;
+        this->n2 = n2;
+        this->n3 = n3;
+    }
+
     Hit intersect(Ray ray) {
         Hit hit;
         hit.hit = false;
@@ -338,12 +355,18 @@ class Triangle : public Object {
 class Mesh : public Object {
 
   private:
-      std::vector<Triangle *> triangles;
+    std::vector<Triangle *> triangles;
 
   public:
-    Mesh(std::vector<Triangle *> triangles)
-        : triangles(triangles){
+    Mesh(std::vector<Triangle *> triangles) : triangles(triangles) { 
     }
+
+    void setMaterial(Material material){
+        for (auto triangle: triangles){
+            triangle->setMaterial(material);
+        }
+    }
+
     Hit intersect(Ray ray) {
         Hit hit;
         hit.hit = false;
@@ -353,9 +376,9 @@ class Mesh : public Object {
         glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
         Ray local_ray(o, d);
 
-        for (auto triangle: triangles){
+        for (auto triangle : triangles) {
             Hit tr_hit = triangle->intersect(local_ray);
-            if (tr_hit.hit && tr_hit.distance < hit.distance){
+            if (tr_hit.hit && tr_hit.distance < hit.distance) {
                 hit = tr_hit;
             }
         }
@@ -369,7 +392,6 @@ class Mesh : public Object {
         return hit;
     }
 };
-
 
 /**
  Light class
@@ -545,6 +567,57 @@ PNG_Image_t * decodeOneStep(const char * filename) {
     return image;
 }
 
+glm::vec3 get_vertex(std::string & line) {
+    std::istringstream stream(line);
+    float p1, p2, p3;
+    std::string v;
+    stream >> v;
+    stream >> p1;
+    stream >> p2;
+    stream >> p3;
+    return glm::vec3(p1, p2, p3);
+}
+
+glm::vec3 get_normals(std::string & line) { return glm::normalize(get_vertex(line)); }
+
+Triangle * get_face(std::string line, std::vector<glm::vec3> vertices,
+                    std::vector<glm::vec3> normals) {
+    std::istringstream stream(line);
+    int i1, i2, i3;
+    std::string f;
+    stream >> f;
+    stream >> i1;
+    stream >> i2;
+    stream >> i3;
+    return normals.size() > 0 ? new Triangle(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1],
+                                             normals[i1 - 1], normals[i2 - 1], normals[i3 - 1])
+                              : new Triangle(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1]);
+}
+
+Mesh * getMeshFromOBJ(std::string filename) {
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> normals;
+    std::vector<Triangle *> faces;
+
+    std::ifstream file(filename);
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line[0] == '#')
+            continue;
+
+        if (line[0] == 'v')
+            vertices.push_back(get_vertex(line));
+
+        if (line.substr(0, 2) == "vn")
+            normals.push_back(get_normals(line));
+
+        if (line[0] == 'f')
+            faces.push_back(get_face(line, vertices, normals));
+    }
+
+    return new Mesh(faces);
+}
+
 /**
  Function defining the scene
  */
@@ -594,11 +667,17 @@ void sceneDefinition() {
     triangles.push_back(t4);
     Mesh * pyramid = new Mesh(triangles);
 
+
     glm::mat4 pyr_translation = glm::translate(glm::vec3(-4, 2, 10));
     glm::mat4 pyr_rotate = glm::rotate(3.14f, glm::vec3(0, 1, 0));
     glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 2, 1));
     pyramid->setTransformation(pyr_translation * pyr_rotate * pyr_scale);
     objects.push_back(pyramid);
+
+    Mesh * teapot = getMeshFromOBJ("teapot.obj");
+    teapot->setMaterial(red_specular);
+    teapot->setTransformation(glm::translate(glm::vec3(0, 1, 10)));
+    objects.push_back(teapot);
 
     // objects.push_back(t1);
     // objects.push_back(t2);
@@ -676,8 +755,8 @@ void sceneDefinition() {
     // objects.push_back(cone2);
 
     lights.push_back(new Light(glm::vec3(0, 20, 5), glm::vec3(.4f)));
-    lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
-    lights.push_back(new Light(glm::vec3(2, 7, 1), glm::vec3(0.2)));
+    // lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
+    // lights.push_back(new Light(glm::vec3(2, 7, 1), glm::vec3(0.2)));
 }
 
 /**
@@ -700,6 +779,7 @@ int main(int argc, const char * argv[]) {
     int height = 768; // height of the image
     float fov = 90;   // field of view
 
+    cout << "Defining the scene..." << endl;
     sceneDefinition(); // Let's define a scene
 
     Image image(width, height); // Create an image where we will store the result
@@ -708,6 +788,7 @@ int main(int argc, const char * argv[]) {
     float X = -s * width / 2;
     float Y = s * height / 2;
 
+    cout << "Coloratin each pixel on the screne..." << endl;
     for (int i = 0; i < width; i++)
         for (int j = 0; j < height; j++) {
 
