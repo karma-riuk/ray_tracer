@@ -323,7 +323,7 @@ class Triangle : public Object {
 
         // cout << glm::to_string(n1) << endl;
         hit.normal = glm::normalize(length(sn1) * n1 + length(sn2) * n2 + length(sn3) * n3);
-        cout << glm::to_string(hit.normal) << endl;
+        // cout << glm::to_string(hit.normal) << endl;
         hit.distance = plane_hit.distance;
         hit.object = this;
         float W = length(sn);
@@ -334,6 +334,42 @@ class Triangle : public Object {
         return hit;
     }
 };
+
+class Mesh : public Object {
+
+  private:
+      std::vector<Triangle *> triangles;
+
+  public:
+    Mesh(std::vector<Triangle *> triangles)
+        : triangles(triangles){
+    }
+    Hit intersect(Ray ray) {
+        Hit hit;
+        hit.hit = false;
+        hit.distance = INFINITY;
+
+        glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
+        glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
+        Ray local_ray(o, d);
+
+        for (auto triangle: triangles){
+            Hit tr_hit = triangle->intersect(local_ray);
+            if (tr_hit.hit && tr_hit.distance < hit.distance){
+                hit = tr_hit;
+            }
+        }
+
+        // cout << glm::to_string(transformationMatrix) << endl;
+        // Retransform in global coordinates
+        hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
+        hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
+        hit.normal = glm::normalize(hit.normal);
+        hit.distance = glm::distance(ray.origin, hit.intersection);
+        return hit;
+    }
+};
+
 
 /**
  Light class
@@ -538,7 +574,7 @@ void sceneDefinition() {
         .shininess = 100,
     };
 
-    glm::vec3 p1(0, 2, 10), p2(-4, 2, 17), p3(4, 2, 17), p4(0, 8, 14);
+    glm::vec3 p1(0, 0, -1), p2(-1, 0, 0), p3(1, 0, 0), p4(0, 1, 0);
     glm::vec3 n1(cross(p3 - p1, p2 - p1)), n2(cross(p2 - p1, p4 - p1)), n3(cross(p4 - p1, p3 - p1)),
         n4(cross(p4 - p3, p2 - p3));
     n1 = glm::normalize(n1);
@@ -549,12 +585,25 @@ void sceneDefinition() {
     Triangle *t1 = new Triangle(p1, p3, p2, n1, n1, n1, green_diffuse),
              *t2 = new Triangle(p2, p4, p1, n2, n2, n2, red_specular),
              *t3 = new Triangle(p1, p4, p3, n3, n3, n3, blue_specular),
-             *t4 = new Triangle(p3, p4, p2, n4, n4, n4, red_specular);
+             *t4 = new Triangle(p3, p4, p2, n4, n4, n4, highly_specular_yellow);
 
-    objects.push_back(t1);
-    objects.push_back(t2);
-    objects.push_back(t3);
-    objects.push_back(t4);
+    std::vector<Triangle *> triangles;
+    triangles.push_back(t1);
+    triangles.push_back(t2);
+    triangles.push_back(t3);
+    triangles.push_back(t4);
+    Mesh * pyramid = new Mesh(triangles);
+
+    glm::mat4 pyr_translation = glm::translate(glm::vec3(-4, 2, 10));
+    glm::mat4 pyr_rotate = glm::rotate(3.14f, glm::vec3(0, 1, 0));
+    glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 2, 1));
+    pyramid->setTransformation(pyr_translation * pyr_rotate * pyr_scale);
+    objects.push_back(pyramid);
+
+    // objects.push_back(t1);
+    // objects.push_back(t2);
+    // objects.push_back(t3);
+    // objects.push_back(t4);
 
     Material refractive{.reflectiveness = 0.1f, .refractiveness = 2.0f};
 
