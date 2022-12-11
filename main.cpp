@@ -147,8 +147,8 @@ class Sphere : public Object {
         glm::vec3 i = o + t * d;
         hit.intersection = i;
         hit.normal = i;
-        hit.uv.x = (asin(i.y) + M_PI / 2) / M_PI;
-        hit.uv.y = (atan2(i.z, i.x) + M_PI) / M_PI;
+        hit.uv.x = (atan2(i.z, i.x) + M_PI) / M_PI;
+        hit.uv.y = (asin(i.y) + M_PI / 2) / M_PI;
 
         bool from_inside = glm::all(glm::lessThan(glm::abs(o), glm::vec3(1)));
         hit.from_outside = !from_inside;
@@ -157,7 +157,8 @@ class Sphere : public Object {
         hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
 
         if (isType<ImageTexture>(material.texture)) {
-            glm::vec3 tangent = glm::vec3(sin(hit.uv.x), 0, cos(hit.uv.y));
+            glm::vec3 tangent = glm::vec3(sin(hit.uv.x), 0, cos(hit.uv.x));
+            // glm::vec3 tangent = glm::vec3(sin(hit.intersection.x), 0, cos(hit.intersection.z));
             glm::vec3 bitangent = glm::cross(hit.normal, tangent);
 
             glm::mat3 tbn(glm::normalize(tangent), glm::normalize(bitangent),
@@ -668,8 +669,8 @@ void sceneDefinition() {
     Mesh * pyramid = new Mesh(triangles);
 
 
-    glm::mat4 pyr_translation = glm::translate(glm::vec3(-4, 2, 10));
-    glm::mat4 pyr_rotate = glm::rotate(3.14f, glm::vec3(0, 1, 0));
+    glm::mat4 pyr_translation = glm::translate(glm::vec3(4, 2, 10));
+    glm::mat4 pyr_rotate = glm::rotate(.7f, glm::vec3(0, 1, 0));
     glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 2, 1));
     pyramid->setTransformation(pyr_translation * pyr_rotate * pyr_scale);
     objects.push_back(pyramid);
@@ -677,7 +678,7 @@ void sceneDefinition() {
     Mesh * teapot = getMeshFromOBJ("teapot.obj");
     teapot->setMaterial(red_specular);
     teapot->setTransformation(glm::translate(glm::vec3(0, 1, 10)));
-    objects.push_back(teapot);
+    // objects.push_back(teapot);
 
     // objects.push_back(t1);
     // objects.push_back(t2);
@@ -709,19 +710,19 @@ void sceneDefinition() {
     // printf("%d, %d, %d, %d\n", roughness->data[0], roughness->data[1], roughness->data[2],
     // roughness->data[3]); cout << glm::to_string(glm::vec3(2) * glm::vec3(4)) << endl;
     Texture * imageTexture = new ImageTexture(
-        *decodeOneStep("./textures/png/Waffle_001_basecolor.png"),
-        *decodeOneStep("./textures/png/Waffle_001_height.png"),
-        *decodeOneStep("./textures/png/Waffle_001_normal.png"),
-        *decodeOneStep("./textures/png/Waffle_001_ambientOcclusion.png"), *roughness);
+        *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_basecolor.png"),
+        *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_height.png"),
+        *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_normal.png"),
+        *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_ambientOcclusion.png"), *roughness);
     textured.texture = imageTexture;
     Sphere * waffle_sphere = new Sphere(textured);
     // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f,
     // glm::vec3(0, 1, 0)));
-    glm::mat4 translation = glm::translate(glm::vec3(-6, 4, 21));
+    glm::mat4 translation = glm::translate(glm::vec3(-6, 4, 12));
     glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
-    glm::mat4 scaling = glm::scale(glm::vec3(7));
+    glm::mat4 scaling = glm::scale(glm::vec3(5));
     waffle_sphere->setTransformation(translation * rotation * scaling);
-    // objects.push_back(waffle_sphere);
+    objects.push_back(waffle_sphere);
 
     // Planes
     Material red_diffuse;
@@ -755,8 +756,8 @@ void sceneDefinition() {
     // objects.push_back(cone2);
 
     lights.push_back(new Light(glm::vec3(0, 20, 5), glm::vec3(.4f)));
-    // lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
-    // lights.push_back(new Light(glm::vec3(2, 7, 1), glm::vec3(0.2)));
+    lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
+    lights.push_back(new Light(glm::vec3(2, 7, 1), glm::vec3(0.2)));
 }
 
 /**
@@ -765,10 +766,9 @@ void sceneDefinition() {
  @return Tonemapped intensity in range (0,1)
  */
 glm::vec3 toneMapping(glm::vec3 intensity) {
-    float gamma = 1.0 / 2.0;
-    float alpha = 12.0f;
-    return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), glm::vec3(0.0),
-                      glm::vec3(1.0));
+    float gamma = 1.0 / 1.8;
+    float alpha = 18.0f;
+    return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
 }
 
 int main(int argc, const char * argv[]) {

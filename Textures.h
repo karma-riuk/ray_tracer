@@ -11,7 +11,7 @@
 #include <vector>
 #define N_SQUARES 16
 #define N_STRIPES 18
-#define TEXTURE_REPETITION 4
+#define TEXTURE_REPETITION 2
 
 #include "glm/glm.hpp"
 
