@@ -1,3 +1,6 @@
 [submodule "lib/lodepng"]
 	path = lib/lodepng
 	url = git@github.com:lvandeve/lodepng.git
+[submodule "lib/doctest"]
+	path = lib/doctest
+	url = git@github.com:doctest/doctest
