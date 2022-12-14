@@ -15,7 +15,7 @@
 #include "Image.h"
 #include "Material.h"
 #include "lib/lodepng/lodepng.h"
-#include "obj_reader.h"
+// #include "obj_reader.h"
 
 using std::stringstream;
 
@@ -457,7 +457,7 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
         if (isType<ImageTexture>(material.texture)) {
             ImageTexture * texture = (ImageTexture *)material.texture;
             // cout << "before " << shininess << endl;
-            diffuse *= texture->occlusion(uv);
+            diffuse *= 5.f;
             shininess = .5 / pow(texture->roughness(uv), 4) - .5;
             // shininess = glm::clamp(shininess, 0.f, 1.f);
             // cout << "after " << shininess << endl;
@@ -473,6 +473,8 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
     }
 
     color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
+        if (isType<ImageTexture>(material.texture)) 
+            color *= ((ImageTexture*) material.texture)->occlusion(uv);
 
     return color;
 }
@@ -534,6 +536,7 @@ glm::vec3 trace_ray(Ray ray) {
         color = (1 - material.reflectiveness) * color +
                 (material.reflectiveness * relfective_component);
     }
+    color *= 2;
 
     return color;
 }
@@ -669,9 +672,9 @@ void sceneDefinition() {
     Mesh * pyramid = new Mesh(triangles);
 
 
-    glm::mat4 pyr_translation = glm::translate(glm::vec3(4, 2, 10));
+    glm::mat4 pyr_translation = glm::translate(glm::vec3(-4, 2, 10));
     glm::mat4 pyr_rotate = glm::rotate(.7f, glm::vec3(0, 1, 0));
-    glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 2, 1));
+    glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 1, 1));
     pyramid->setTransformation(pyr_translation * pyr_rotate * pyr_scale);
     objects.push_back(pyramid);
 
@@ -698,10 +701,14 @@ void sceneDefinition() {
     Sphere * refractive_sphere = new Sphere(refractive);
     refractive_sphere->setTransformation(glm::translate(glm::vec3(-3, -1, 8)) *
                                          glm::scale(glm::vec3(2)));
-    // objects.push_back(refractive_sphere);
+    objects.push_back(refractive_sphere);
 
     // Textured sphere
-    Material textured{
+    Material stone_textured{
+        .specular = glm::vec3(.6f),
+        .shininess = 100,
+    };
+    Material waffle_textured{
         .specular = glm::vec3(.6f),
         .shininess = 100,
     };
@@ -709,20 +716,33 @@ void sceneDefinition() {
     PNG_Image_t * roughness = decodeOneStep("./textures/png/Waffle_001_roughness.png");
     // printf("%d, %d, %d, %d\n", roughness->data[0], roughness->data[1], roughness->data[2],
     // roughness->data[3]); cout << glm::to_string(glm::vec3(2) * glm::vec3(4)) << endl;
-    Texture * imageTexture = new ImageTexture(
+    Texture * stoneImageTexture = new ImageTexture(
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_basecolor.png"),
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_height.png"),
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_normal.png"),
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_ambientOcclusion.png"), *roughness);
-    textured.texture = imageTexture;
-    Sphere * waffle_sphere = new Sphere(textured);
+    Texture * waffleImageTexture = new ImageTexture(
+        *decodeOneStep("./textures/png/Waffle_001_basecolor.png"),
+        *decodeOneStep("./textures/png/Waffle_001_height.png"),
+        *decodeOneStep("./textures/png/Waffle_001_normal.png"),
+        *decodeOneStep("./textures/png/Waffle_001_ambientOcclusion.png"), *roughness);
+    stone_textured.texture = stoneImageTexture;
+    waffle_textured.texture = waffleImageTexture;
+    Sphere * waffle_sphere = new Sphere(waffle_textured);
+    Sphere * stone_sphere = new Sphere(stone_textured);
     // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f,
     // glm::vec3(0, 1, 0)));
-    glm::mat4 translation = glm::translate(glm::vec3(-6, 4, 12));
+    glm::mat4 translation = glm::translate(glm::vec3(0, -1.5, 6));
     glm::mat4 rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
-    glm::mat4 scaling = glm::scale(glm::vec3(5));
+    glm::mat4 scaling = glm::scale(glm::vec3(1.5));
     waffle_sphere->setTransformation(translation * rotation * scaling);
     objects.push_back(waffle_sphere);
+
+    translation = glm::translate(glm::vec3(4, 2, 10));
+    rotation = glm::rotate(.2f, glm::vec3(0, 1, 0));
+    scaling = glm::scale(glm::vec3(3));
+    stone_sphere->setTransformation(translation * rotation * scaling);
+    objects.push_back(stone_sphere);
 
     // Planes
     Material red_diffuse;
@@ -745,15 +765,15 @@ void sceneDefinition() {
 
     Cone * cone1 = new Cone(green_diffuse);
     cone1->setTransformation(green_cone_trans);
-    // objects.push_back(cone1);
+    objects.push_back(cone1);
 
     glm::mat4 yellow_cone_trans =
-        glm::scale(glm::translate(glm::vec3(5, 9, 14)) * glm::rotate(3.1415f, glm::vec3(0, 0, 1)),
+        glm::scale(glm::translate(glm::vec3(-5, 9, 14)) * glm::rotate(3.1415f, glm::vec3(0, 0, 1)),
                    glm::vec3(3, 12, 3));
 
     Cone * cone2 = new Cone(highly_specular_yellow);
     cone2->setTransformation(yellow_cone_trans);
-    // objects.push_back(cone2);
+    objects.push_back(cone2);
 
     lights.push_back(new Light(glm::vec3(0, 20, 5), glm::vec3(.4f)));
     lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
@@ -768,6 +788,7 @@ void sceneDefinition() {
 glm::vec3 toneMapping(glm::vec3 intensity) {
     float gamma = 1.0 / 1.8;
     float alpha = 18.0f;
+    // return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
     return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
 }
 

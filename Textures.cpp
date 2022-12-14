@@ -39,7 +39,7 @@ glm::vec4 ImageTexture::getRGBAat(glm::vec2 uv, PNG_Image_t & image) {
 // - a one dimentional vector containing the color of the pixels in format RBGA RGBA ...
 // (hence the length of the vector is 4 * width * height)
 glm::vec3 ImageTexture::texture(glm::vec2 uv) {
-    return ImageTexture::getRGBAat(uv, this->base_color);
+    return glm::pow(ImageTexture::getRGBAat(uv, this->base_color), glm::vec4(2.2f));
 }
 
 glm::vec3 ImageTexture::normal(glm::vec2 uv) {
