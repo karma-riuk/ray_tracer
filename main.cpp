@@ -787,12 +787,11 @@ void sceneDefinition() {
     blue_specular.shininess = 100.0;
     // blue_specular.reflectiveness = .9f;
 
-    Material highly_specular_yellow{
-        .ambient = glm::vec3(0.1f, 0.1f, 0.03f),
-        .diffuse = glm::vec3(.6f, .6f, 0.1f),
-        .specular = glm::vec3(.6f),
-        .shininess = 100,
-    };
+    Material highly_specular_yellow;
+        highly_specular_yellow.ambient = glm::vec3(0.1f, 0.1f, 0.03f);
+        highly_specular_yellow.diffuse = glm::vec3(.6f, .6f, 0.1f);
+        highly_specular_yellow.specular = glm::vec3(.6f);
+        highly_specular_yellow.shininess = 100;
 
     glm::vec3 p1(0, 0, -1), p2(-1, 0, 0), p3(1, 0, 0), p4(0, 1, 0);
     glm::vec3 n1(cross(p3 - p1, p2 - p1)), n2(cross(p2 - p1, p4 - p1)), n3(cross(p4 - p1, p3 - p1)),
@@ -843,7 +842,9 @@ void sceneDefinition() {
     // objects.push_back(t3);
     // objects.push_back(t4);
 
-    Material refractive{.reflectiveness = 0.1f, .refractiveness = 2.0f};
+    Material refractive;
+    refractive.reflectiveness = 0.1f;
+    refractive.refractiveness = 2.0f;
 
     Sphere * blue_sphere = new Sphere(blue_specular);
     blue_sphere->setTransformation(glm::translate(glm::vec3(1, -2, 8)));
@@ -859,23 +860,21 @@ void sceneDefinition() {
     // objects.push_back(refractive_sphere);
 
     // Textured sphere
-    Material stone_textured{
-        .specular = glm::vec3(.6f),
-        .shininess = 100,
-    };
-    Material waffle_textured{
-        .specular = glm::vec3(.6f),
-        .shininess = 100,
-    };
-    Material water_textured{
-        .specular = glm::vec3(.9f),
-        .shininess = 100,
-        .refractiveness = .825f
-    };
-    Material sand_textured{
-        .specular = glm::vec3(.2f),
-        .shininess = 100,
-    };
+    Material stone_textured;
+        stone_textured.specular = glm::vec3(.6f);
+        stone_textured.shininess = 100;
+    Material waffle_textured;
+        waffle_textured.specular = glm::vec3(.6f);
+        waffle_textured.shininess = 100;
+
+    Material water_textured;
+    water_textured.specular = glm::vec3(.9f);
+    water_textured.shininess = 100;
+    water_textured.refractiveness = .825f;
+
+    Material sand_textured;
+        sand_textured.specular = glm::vec3(.2f);
+        sand_textured.shininess = 100;
     // textured.texture = &rainbowTexture;
     Texture * sandImageTexture = new ImageTexture(
         *decodeOneStep("./textures/png/Sand_005_baseColor.png"),
