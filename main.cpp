@@ -79,7 +79,7 @@ class Object {
     /** Function that set the material
      @param material A structure describing the material of the object
     */
-    void setMaterial(Material material) { this->material = material; }
+    virtual void setMaterial(Material material) { this->material = material; }
     /** Functions for setting up all the transformation matrices
      @param matrix The matrix representing the transformation of the object in the global
      coordinates */
@@ -327,8 +327,6 @@ class Cone : public Object {
 };
 
 class Fragment : public Object {
-  public:
-    virtual void setMaterial(Material material) = 0;
 };
 
 class Triangle : public Fragment {
@@ -362,8 +360,6 @@ class Triangle : public Fragment {
         float max_z = max(p1.z, max(p2.z, p3.z));
         return glm::vec3(max_x, max_y, max_z);
     }
-
-    void setMaterial(Material material) { this->material = material; }
 
     void set_normals(glm::vec3 n1, glm::vec3 n2, glm::vec3 n3) {
         this->n1 = n1;
@@ -423,7 +419,7 @@ class Diamond : public Fragment {
         t2 = new Triangle(p2, p3, p4);
     }
 
-    glm::vec3 getMinCoords() {
+    glm::vec3 getMinCoords() override {
         glm::vec3 min1 = t1->getMinCoords();
         glm::vec3 min2 = t2->getMinCoords();
         float min_x = min(min1.x, min2.x);
@@ -431,7 +427,7 @@ class Diamond : public Fragment {
         float min_z = min(min1.z, min2.z);
         return glm::vec3(min_x, min_y, min_z);
     }
-    glm::vec3 getMaxCoords() {
+    glm::vec3 getMaxCoords() override {
         glm::vec3 max1 = t1->getMaxCoords();
         glm::vec3 max2 = t2->getMaxCoords();
         float max_x = max(max1.x, max2.x);
@@ -440,12 +436,12 @@ class Diamond : public Fragment {
         return glm::vec3(max_x, max_y, max_z);
     }
 
-    void setMaterial(Material material) {
+    void setMaterial(Material material) override {
         t1->setMaterial(material);
         t2->setMaterial(material);
     }
 
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray) override {
         Hit hit;
         hit.hit = false;
         Hit t1_hit = t1->intersect(ray);
@@ -906,7 +902,7 @@ void sceneDefinition() {
     Mesh * seashell = getMeshFromOBJ("shell.obj");
     seashell->setMaterial(red_specular);
     glm::mat4 seashellTransformation =
-        glm::translate(glm::vec3(0, -10, 15)) * glm::scale(glm::vec3(.2));
+        glm::translate(glm::vec3(0, -5, 10)) * glm::scale(glm::vec3(.2));
     seashell->setTransformation(seashellTransformation);
     Box * seashellBox = new Box(seashell->getMinCoords(), seashell->getMaxCoords(), seashell);
     seashellBox->setTransformation(seashellTransformation);
@@ -1048,6 +1044,25 @@ glm::vec3 toneMapping(glm::vec3 intensity) {
     return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
 }
 
+
+long N_PIXELS;
+
+void print_progress_bar(int pixel){
+    float progress = (float) pixel / N_PIXELS;
+    int barWidth = 70;
+
+    std::cout << "[";
+    int pos = barWidth * progress;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    // std::cout << "] " << int(progress * 100.0) << " %\r";
+    printf("] %.2f %%\r", progress * 100);
+    std::cout.flush();
+}
+
 int main(int argc, const char * argv[]) {
 
     clock_t t = clock(); // variable for keeping the time of the rendering
@@ -1055,11 +1070,16 @@ int main(int argc, const char * argv[]) {
     int width = 1024; // width of the image
     int height = 768; // height of the image
     float fov = 90;   // field of view
+    N_PIXELS = width * height;
 
     cout << "Defining the scene..." << endl;
     sceneDefinition(); // Let's define a scene
 
     Image image(width, height); // Create an image where we will store the result
+#ifdef ANTI_ALIASING
+    cout << "Anti aliasing" << endl;
+    N_PIXELS *= 9;
+#endif
 
     float s = 2 * tan(0.5 * fov / 180 * M_PI) / width;
     float X = -s * width / 2;
@@ -1069,11 +1089,13 @@ int main(int argc, const char * argv[]) {
 
     cout << "Coloratin each pixel on the screne..." << endl;
     glm::vec3 origin(0, 10, 0);
-    for (int i = 0; i < width; i++)
+    for (int i = 0; i < width; i++){
+
         for (int j = 0; j < height; j++) {
 
             float dz = 1;
             // top left of the pixel
+#ifdef ANTI_ALIASING
             float dx = X + i * s;
             float dy = Y - j * s;
             glm::vec3 color(0);
@@ -1087,10 +1109,23 @@ int main(int argc, const char * argv[]) {
 
                 Ray ray(origin, direction);
                 color += (float)subpixel_weights[k] * trace_ray(ray);
+                // print_progress_bar((i * height + j) * 9 + k);
             }
+
             color /= 16.f;
+#else
+            float dx = X + i * s + s / 2;
+            float dy = Y - j * s + s / 2;
+            glm::vec3 direction(dx, dy, dz);
+            direction += glm::vec3(0, -1.5, 0);
+            Ray ray(origin, direction);
+            glm::vec3 color = trace_ray(ray);
+            // print_progress_bar(i * height + j);
+#endif
             image.setPixel(i, j, toneMapping(color));
         }
+        print_progress_bar((i+1) * height);
+    }
 
     t = clock() - t;
     cout << "It took " << ((float)t) / CLOCKS_PER_SEC << " seconds to render the image." << endl;
