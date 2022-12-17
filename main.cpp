@@ -503,23 +503,23 @@ class Box : public Object {
         glm::vec3 E(v1.x, v1.y, v2.z);
         glm::vec3 F(v2.x, v1.y, v2.z);
         glm::vec3 H(v1.x, v2.y, v2.z);
-            triangles[0] = Triangle(B, A, D);
-            triangles[1] = Triangle(C, B, D);
-
-            triangles[2] = Triangle(F, B, C);
-            triangles[3] = Triangle(G, F, C);
-
-            triangles[4] = Triangle(E, F, G);
-            triangles[5] = Triangle(H, E, G);
-
-            triangles[6] = Triangle(A, E, H);
-            triangles[7] = Triangle(D, A, H);
-
-            triangles[8] = Triangle(C, D, H);
-            triangles[9] = Triangle(G, C, H);
-
-            triangles[10] = Triangle(F, E, A);;
-            triangles[11] = Triangle(B, F, A);
+            triangles.push_back(Triangle(B, A, D));
+            triangles.push_back(Triangle(C, B, D));
+                                                   
+            triangles.push_back(Triangle(F, B, C));
+            triangles.push_back(Triangle(G, F, C));
+                                                   
+            triangles.push_back(Triangle(E, F, G));
+            triangles.push_back(Triangle(H, E, G));
+                                                   
+            triangles.push_back(Triangle(A, E, H));
+            triangles.push_back(Triangle(D, A, H));
+                                                   
+            triangles.push_back(Triangle(C, D, H));
+            triangles.push_back(Triangle(G, C, H));
+                                                   
+            triangles.push_back( Triangle(F, E, A));
+            triangles.push_back( Triangle(B, F, A));
     }
 
     glm::vec3 getMinCoords() { return transformationMatrix * glm::vec4(v1, 1); }
@@ -700,12 +700,17 @@ PNG_Image_t * decodeOneStep(const char * filename) {
     }
 
     PNG_Image_t * image = (PNG_Image_t *)malloc(sizeof(PNG_Image_t));
-    if (!image)
-        return 0;
+    assert(image);
     // printf("png image: %dx%d\n", width, height);
     image->width = width;
     image->height = height;
-    image->data = data;
+    image->data = std::vector<unsigned char>(data);
+
+    // *image = {
+    //     .width = width,
+    //     .height = height,
+    //     .data = data,
+    // };
 
     // the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as
     // texture, draw it, ...
