@@ -25,8 +25,9 @@ using namespace std;
 /**
  Class representing a single ray.
  */
-class Ray {
-  public:
+class Ray
+{
+public:
     glm::vec3 origin;    ///< Origin of the ray
     glm::vec3 direction; ///< Direction of the ray
                          /**
@@ -42,12 +43,13 @@ class Object;
 /**
  Structure representing the even of hitting an object
  */
-struct Hit {
-    bool hit; ///< Boolean indicating whether there was or there was no intersection with an object
+struct Hit
+{
+    bool hit;               ///< Boolean indicating whether there was or there was no intersection with an object
     glm::vec3 normal;       ///< Normal vector of the intersected object at the intersection point
     glm::vec3 intersection; ///< Point of Intersection
     float distance;         ///< Distance from the origin of the ray to the intersection point
-    Object * object;        ///< A pointer to the intersected object
+    Object *object;         ///< A pointer to the intersected object
     glm::vec2 uv;           ///< Coordinates for computing the texture (texture coordinates)
     bool from_outside = true;
 };
@@ -55,17 +57,18 @@ struct Hit {
 /**
  General class for the object
  */
-class Object {
+class Object
+{
 
-  protected:
-    glm::mat4 transformationMatrix; ///< Matrix representing the transformation from the local to
-                                    ///< the global coordinate system
+protected:
+    glm::mat4 transformationMatrix;        ///< Matrix representing the transformation from the local to
+                                           ///< the global coordinate system
     glm::mat4 inverseTransformationMatrix; ///< Matrix representing the transformation from the
                                            ///< global to the local coordinate system
-    glm::mat4 normalMatrix; ///< Matrix for transforming normal vectors from the local to the global
-                            ///< coordinate system
+    glm::mat4 normalMatrix;                ///< Matrix for transforming normal vectors from the local to the global
+                                           ///< coordinate system
 
-  public:
+public:
     glm::vec3 color;   ///< Color of the object
     Material material; ///< Structure describing the material of the object
                        /** A function computing an intersection, which returns the structure Hit */
@@ -82,7 +85,8 @@ class Object {
     /** Functions for setting up all the transformation matrices
      @param matrix The matrix representing the transformation of the object in the global
      coordinates */
-    void setTransformation(glm::mat4 matrix) {
+    void setTransformation(glm::mat4 matrix)
+    {
 
         transformationMatrix = matrix;
 
@@ -93,19 +97,22 @@ class Object {
     }
 };
 
-template <class DstType, class SrcType> bool isType(const SrcType * src) {
+template <class DstType, class SrcType>
+bool isType(const SrcType *src)
+{
     return dynamic_cast<const DstType *>(src) != nullptr;
 }
 
 /**
  Implementation of the class Object for sphere shape.
  */
-class Sphere : public Object {
-  private:
+class Sphere : public Object
+{
+private:
     float radius;     ///< Radius of the sphere
     glm::vec3 center; ///< Center of the sphere
 
-  public:
+public:
     /**
      The constructor of the sphere
      @param radius Radius of the sphere
@@ -119,7 +126,8 @@ class Sphere : public Object {
     glm::vec3 getMaxCoords() { return transformationMatrix * glm::vec4(1, 1, 1, 1); }
 
     /** Implementation of the intersection function*/
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray)
+    {
 
         glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
         glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
@@ -162,7 +170,8 @@ class Sphere : public Object {
         // Retransform in global coordinates
         hit.intersection = transformationMatrix * glm::vec4(hit.intersection, 1);
 
-        if (isType<ImageTexture>(material.texture)) {
+        if (isType<ImageTexture>(material.texture))
+        {
             glm::vec3 tangent = glm::vec3(sin(hit.uv.x), 0, cos(hit.uv.x));
             // glm::vec3 tangent = glm::vec3(sin(hit.intersection.x), 0, cos(hit.intersection.z));
             glm::vec3 bitangent = glm::cross(hit.normal, tangent);
@@ -170,12 +179,14 @@ class Sphere : public Object {
             glm::mat3 tbn(glm::normalize(tangent), glm::normalize(bitangent),
                           glm::normalize(hit.normal));
 
-            ImageTexture * texture = (ImageTexture *)material.texture;
+            ImageTexture *texture = (ImageTexture *)material.texture;
             glm::vec3 tmp_normal = texture->normal(hit.uv);
             tmp_normal = (2.f * tmp_normal) - glm::vec3(1);
             tmp_normal = tbn * tmp_normal;
             hit.normal = normalMatrix * glm::vec4(tmp_normal, 0);
-        } else {
+        }
+        else
+        {
             hit.normal = normalMatrix * glm::vec4(hit.normal, 0);
         }
         hit.normal = glm::normalize(hit.normal);
@@ -189,13 +200,15 @@ class Sphere : public Object {
     }
 };
 
-class Plane : public Object {
+class Plane : public Object
+{
 
-  private:
+private:
     glm::vec3 point;
     glm::vec3 b1, b2;
     glm::vec3 normal;
-    static glm::vec3 computeB1(glm::vec3 n) {
+    static glm::vec3 computeB1(glm::vec3 n)
+    {
         glm::vec3 a = glm::cross(n, glm::vec3(1, 0, 0));
         glm::vec3 b = glm::cross(n, glm::vec3(0, 1, 0));
         glm::vec3 max_a_b = glm::dot(a, a) > glm::dot(b, b) ? a : b;
@@ -203,33 +216,39 @@ class Plane : public Object {
         return glm::normalize(glm::dot(max_a_b, max_a_b) < glm::dot(c, c) ? c : max_a_b);
     }
 
-  public:
-    void computeBaseVectors(){
+public:
+    void computeBaseVectors()
+    {
         b1 = .1f * computeB1(normal);
         b2 = .1f * glm::cross(normal, b1);
     }
 
-    Plane(glm::vec3 point, glm::vec3 normal) : point(point), normal(normal) {
+    Plane(glm::vec3 point, glm::vec3 normal) : point(point), normal(normal)
+    {
         computeBaseVectors();
     }
-    Plane(glm::vec3 point, glm::vec3 normal, Material material) : point(point), normal(normal) {
+    Plane(glm::vec3 point, glm::vec3 normal, Material material) : point(point), normal(normal)
+    {
         computeBaseVectors();
         this->material = material;
     }
 
     glm::vec3 getMaxCoords() { return point; }
     glm::vec3 getMinCoords() { return point; }
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray)
+    {
 
         Hit hit;
         hit.hit = false;
         float DdotN = glm::dot(ray.direction, normal);
-        if (DdotN < 0) {
+        if (DdotN < 0)
+        {
 
             float PdotN = glm::dot(point - ray.origin, normal);
             float t = PdotN / DdotN;
 
-            if (t > 0) {
+            if (t > 0)
+            {
                 hit.hit = true;
                 hit.normal = normal;
                 hit.distance = t;
@@ -238,9 +257,10 @@ class Plane : public Object {
                 hit.uv.x = glm::dot(b1, hit.intersection);
                 hit.uv.y = glm::dot(b2, hit.intersection);
 
-                if (isType<ImageTexture>(material.texture)) {
+                if (isType<ImageTexture>(material.texture))
+                {
                     glm::mat3 tbn(b1, b2, normal);
-                    ImageTexture * texture = (ImageTexture *)material.texture;
+                    ImageTexture *texture = (ImageTexture *)material.texture;
                     glm::vec3 tmp_normal = texture->normal(hit.uv);
                     tmp_normal = (2.f * tmp_normal) - glm::vec3(1);
                     tmp_normal = tbn * tmp_normal;
@@ -257,16 +277,19 @@ class Plane : public Object {
     }
 };
 
-class Cone : public Object {
+class Cone : public Object
+{
     Plane base;
 
-  public:
-    Cone(Material material) : base(glm::vec3(0, 1, 0), glm::vec3(0, 1, 0), material) {
+public:
+    Cone(Material material) : base(glm::vec3(0, 1, 0), glm::vec3(0, 1, 0), material)
+    {
         this->material = material;
     }
     glm::vec3 getMinCoords() { return transformationMatrix * glm::vec4(-1, 0, -1, 1); }
     glm::vec3 getMaxCoords() { return transformationMatrix * glm::vec4(1, 1, 1, 1); }
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray)
+    {
 
         Hit hit;
         hit.hit = false;
@@ -301,9 +324,12 @@ class Cone : public Object {
 
         glm::vec3 i;
         i = o + t * d;
-        if (i.y > 1) {
+        if (i.y > 1)
+        {
             hit = base.intersect(local_ray);
-        } else {
+        }
+        else
+        {
             hit.hit = true;
             hit.object = this;
             hit.intersection = i;
@@ -325,14 +351,22 @@ class Cone : public Object {
     }
 };
 
-class Triangle : public Object {
+class Fragment : public Object
+{
+    public:
+        virtual void setMaterial(Material material) = 0;
+};
 
-  private:
+class Triangle : public Fragment
+{
+
+private:
     glm::vec3 p1, p2, p3;
     glm::vec3 n1, n2, n3;
 
-  public:
-    Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) : p1(p1), p2(p2), p3(p3) {
+public:
+    Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) : p1(p1), p2(p2), p3(p3)
+    {
         n1 = n2 = n3 = glm::normalize(cross(p3 - p1, p2 - p1));
     }
 
@@ -340,31 +374,41 @@ class Triangle : public Object {
         : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {}
     Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3,
              Material material)
-        : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {
-        this->material = material;
+        : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3)
+    {
+        ((Fragment * )this)->material = material;
     }
 
-    glm::vec3 getMinCoords() {
+    glm::vec3 getMinCoords()
+    {
         float min_x = min(p1.x, min(p2.x, p3.x));
         float min_y = min(p1.y, min(p2.y, p3.y));
         float min_z = min(p1.z, min(p2.z, p3.z));
         return glm::vec3(min_x, min_y, min_z);
     }
-    glm::vec3 getMaxCoords() {
+    glm::vec3 getMaxCoords()
+    {
         float max_x = max(p1.x, max(p2.x, p3.x));
         float max_y = max(p1.y, max(p2.y, p3.y));
         float max_z = max(p1.z, max(p2.z, p3.z));
         return glm::vec3(max_x, max_y, max_z);
     }
 
-    void set_normals(glm::vec3 n1, glm::vec3 n2, glm::vec3 n3) {
+    void setMaterial(Material material) {
+        this->material = material;
+    }
+
+    void set_normals(glm::vec3 n1, glm::vec3 n2, glm::vec3 n3)
+    {
         this->n1 = n1;
         this->n2 = n2;
         this->n3 = n3;
     }
 
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray)
+    {
         Hit hit;
+        hit.distance = INFINITY;
         hit.hit = false;
 
         glm::vec3 sn = glm::cross(p2 - p1, p3 - p1);
@@ -385,7 +429,8 @@ class Triangle : public Object {
         sign2 = glm::sign(glm::dot(sn2, sn));
         sign3 = glm::sign(glm::dot(sn3, sn));
         // printf("sign 1: %f, sign 2: %f, sign 2: %f...", sign1, sign2, sign3);
-        if (sign1 < 0 || sign2 < 0 || sign3 < 0) {
+        if (sign1 < 0 || sign2 < 0 || sign3 < 0)
+        {
             // printf("aborted\n");
             return hit; // not hit
         }
@@ -393,10 +438,9 @@ class Triangle : public Object {
         hit.hit = true;
         hit.intersection = p;
 
-
         hit.normal = glm::normalize(length(sn1) * n1 + length(sn2) * n2 + length(sn3) * n3);
         hit.distance = plane_hit.distance;
-        hit.object = this;
+        hit.object = (Fragment *) this;
         float W = length(sn);
         hit.uv = glm::vec2(length(sn1) / W, length(sn2) / W);
         // hit.from_outside = dot(hit.normal, ray.direction) < 0;
@@ -406,51 +450,110 @@ class Triangle : public Object {
     }
 };
 
-class Mesh : public Object {
+class Diamond : public Fragment
+{
+private:
+    Triangle *t1, *t2;
 
-  private:
-    std::vector<Triangle *> triangles;
+public:
+    Diamond(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 p4)
+    {
+        t1 = new Triangle(p1, p2, p4);
+        t2 = new Triangle(p2, p3, p4);
+    }
 
-  public:
-    Mesh(std::vector<Triangle *> triangles) : triangles(triangles) {}
+    glm::vec3 getMinCoords()
+    {
+        glm::vec3 min1 = t1->getMinCoords();
+        glm::vec3 min2 = t2->getMinCoords();
+        float min_x = min(min1.x, min2.x);
+        float min_y = min(min1.y, min2.y);
+        float min_z = min(min1.z, min2.z);
+        return glm::vec3(min_x, min_y, min_z);
+    }
+    glm::vec3 getMaxCoords()
+    {
+        glm::vec3 max1 = t1->getMaxCoords();
+        glm::vec3 max2 = t2->getMaxCoords();
+        float max_x = max(max1.x, max2.x);
+        float max_y = max(max1.y, max2.y);
+        float max_z = max(max1.z, max2.z);
+        return glm::vec3(max_x, max_y, max_z);
+    }
 
     void setMaterial(Material material) {
-        for (auto triangle : triangles) {
-            triangle->setMaterial(material);
+        t1->setMaterial(material);
+        t2->setMaterial(material);
+    }
+
+    Hit intersect(Ray ray)
+    {
+        Hit hit;
+        hit.hit = false;
+        Hit t1_hit = t1->intersect(ray);
+        Hit t2_hit = t2->intersect(ray);
+        if (!(t1_hit.hit || t2_hit.hit))
+        {
+            return hit;
+        }
+        hit = (t1_hit.distance < t2_hit.distance) ? t1_hit : t2_hit;
+        return hit;
+    }
+};
+
+class Mesh : public Object
+{
+
+private:
+    std::vector<Fragment *> fragments;
+
+public:
+    Mesh(std::vector<Fragment *> fragments) : fragments(fragments) {}
+
+    void setMaterial(Material material)
+    {
+        for (auto fragment : fragments)
+        {
+            fragment->setMaterial(material);
         }
     }
 
-    glm::vec3 getMinCoords() {
+    glm::vec3 getMinCoords()
+    {
         float min_x = INFINITY;
         float min_y = INFINITY;
         float min_z = INFINITY;
-        for (auto triangle : triangles) {
+        for (auto fragment : fragments)
+        {
             // triangle->setTransformation(transformationMatrix);
-            glm::vec3 triangle_min = triangle->getMinCoords();
+            glm::vec3 fragment_min = fragment->getMinCoords();
             // triangle->setTransformation(glm::translate(glm::vec3(0)));
-            min_x = min(min_x, triangle_min.x);
-            min_y = min(min_y, triangle_min.y);
-            min_z = min(min_z, triangle_min.z);
+            min_x = min(min_x, fragment_min.x);
+            min_y = min(min_y, fragment_min.y);
+            min_z = min(min_z, fragment_min.z);
         }
 
         return glm::vec3(min_x, min_y, min_z);
     }
-    glm::vec3 getMaxCoords() {
+    glm::vec3 getMaxCoords()
+    {
         float max_x = -INFINITY;
         float max_y = -INFINITY;
         float max_z = -INFINITY;
-        for (auto triangle : triangles) {
+        for (auto fragment : fragments)
+        {
             // triangle->setTransformation(transformationMatrix);
-            glm::vec3 triangle_max = triangle->getMaxCoords();
+            glm::vec3 fragment_max = fragment->getMaxCoords();
             // triangle->setTransformation(glm::translate(glm::vec3(0)));
-            max_x = max(max_x, triangle_max.x);
-            max_y = max(max_y, triangle_max.y);
-            max_z = max(max_z, triangle_max.z);
+            max_x = max(max_x, fragment_max.x);
+            max_y = max(max_y, fragment_max.y);
+            max_z = max(max_z, fragment_max.z);
         }
         return glm::vec3(max_x, max_y, max_z);
     }
 
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray)
+    {
         Hit hit;
         hit.hit = false;
         hit.distance = INFINITY;
@@ -459,9 +562,11 @@ class Mesh : public Object {
         glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
         Ray local_ray(o, d);
 
-        for (auto triangle : triangles) {
-            Hit tr_hit = triangle->intersect(local_ray);
-            if (tr_hit.hit && tr_hit.distance < hit.distance) {
+        for (auto fragment : fragments)
+        {
+            Hit tr_hit = fragment->intersect(local_ray);
+            if (tr_hit.hit && tr_hit.distance < hit.distance)
+            {
                 hit = tr_hit;
             }
         }
@@ -478,22 +583,25 @@ class Mesh : public Object {
 /**
  Light class
  */
-class Light {
-  public:
+class Light
+{
+public:
     glm::vec3 position; ///< Position of the light source
     glm::vec3 color;    ///< Color/intentisty of the light source
     Light(glm::vec3 position) : position(position) { color = glm::vec3(1.0); }
     Light(glm::vec3 position, glm::vec3 color) : position(position), color(color) {}
 };
 
-class Box : public Object {
-  private:
+class Box : public Object
+{
+private:
     glm::vec3 v1, v2;
-    Object * obj;
+    Object *obj;
     std::vector<Triangle> triangles;
 
-  public:
-    Box(glm::vec3 v1, glm::vec3 v2, Object * obj) : v1(v1), v2(v2), obj(obj) {
+public:
+    Box(glm::vec3 v1, glm::vec3 v2, Object *obj) : v1(v1), v2(v2), obj(obj)
+    {
         glm::vec3 A(v1);
         glm::vec3 B(v2.x, v1.y, v1.z);
         glm::vec3 C(v2.x, v2.y, v1.z);
@@ -503,28 +611,29 @@ class Box : public Object {
         glm::vec3 E(v1.x, v1.y, v2.z);
         glm::vec3 F(v2.x, v1.y, v2.z);
         glm::vec3 H(v1.x, v2.y, v2.z);
-            triangles.push_back(Triangle(B, A, D));
-            triangles.push_back(Triangle(C, B, D));
-                                                   
-            triangles.push_back(Triangle(F, B, C));
-            triangles.push_back(Triangle(G, F, C));
-                                                   
-            triangles.push_back(Triangle(E, F, G));
-            triangles.push_back(Triangle(H, E, G));
-                                                   
-            triangles.push_back(Triangle(A, E, H));
-            triangles.push_back(Triangle(D, A, H));
-                                                   
-            triangles.push_back(Triangle(C, D, H));
-            triangles.push_back(Triangle(G, C, H));
-                                                   
-            triangles.push_back( Triangle(F, E, A));
-            triangles.push_back( Triangle(B, F, A));
+        triangles.push_back(Triangle(B, A, D));
+        triangles.push_back(Triangle(C, B, D));
+
+        triangles.push_back(Triangle(F, B, C));
+        triangles.push_back(Triangle(G, F, C));
+
+        triangles.push_back(Triangle(E, F, G));
+        triangles.push_back(Triangle(H, E, G));
+
+        triangles.push_back(Triangle(A, E, H));
+        triangles.push_back(Triangle(D, A, H));
+
+        triangles.push_back(Triangle(C, D, H));
+        triangles.push_back(Triangle(G, C, H));
+
+        triangles.push_back(Triangle(F, E, A));
+        triangles.push_back(Triangle(B, F, A));
     }
 
     glm::vec3 getMinCoords() { return transformationMatrix * glm::vec4(v1, 1); }
     glm::vec3 getMaxCoords() { return transformationMatrix * glm::vec4(v2, 1); }
-    Hit intersect(Ray ray) {
+    Hit intersect(Ray ray)
+    {
         Hit hit;
         hit.hit = false;
         hit.distance = INFINITY;
@@ -534,7 +643,8 @@ class Box : public Object {
         Ray local_ray(o, d);
 
         Hit tmp_hit;
-        for (auto triangle : triangles) {
+        for (auto triangle : triangles)
+        {
             // triangle.setMaterial(material);
             tmp_hit = triangle.intersect(local_ray);
             // if (tmp_hit.hit && tmp_hit.distance < hit.distance)
@@ -552,7 +662,8 @@ vector<Object *> objects; ///< A list of all objects in the scene
 glm::vec3 tray_ray(Ray ray);
 Hit find_closest_hit(Ray ray);
 
-glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index) {
+glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index)
+{
     glm::vec3 a = n * glm::dot(i, n);
     glm::vec3 b = i - a;
     float beta = 1 / index;
@@ -568,12 +679,14 @@ glm::vec3 refract(glm::vec3 i, glm::vec3 n, float index) {
  @param material A material structure representing the material of the object
 */
 glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 view_direction,
-                     Material material) {
+                     Material material)
+{
     glm::vec3 refractive_component(0);
 
     glm::vec3 color = ambient_light * material.ambient;
 
-    for (size_t light_num = 0; light_num < lights.size(); light_num++) {
+    for (size_t light_num = 0; light_num < lights.size(); light_num++)
+    {
 
         glm::vec3 light_position = lights[light_num]->position;
         glm::vec3 light_direction = glm::normalize(light_position - point);
@@ -589,15 +702,17 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
         float VdotR = glm::clamp(glm::dot(view_direction, reflected_direction), 0.0f, 1.0f);
 
         glm::vec3 diffuse_color = material.diffuse;
-        if (material.texture) {
+        if (material.texture)
+        {
             diffuse_color = material.texture->texture(uv);
         }
 
         glm::vec3 diffuse = diffuse_color * glm::vec3(NdotL);
         float shininess = material.shininess;
 
-        if (isType<ImageTexture>(material.texture)) {
-            ImageTexture * texture = (ImageTexture *)material.texture;
+        if (isType<ImageTexture>(material.texture))
+        {
+            ImageTexture *texture = (ImageTexture *)material.texture;
             diffuse *= 5.f;
             shininess = .5 / pow(texture->roughness(uv), 4) - .5;
             // shininess = glm::clamp(shininess, 0.f, 1.f);
@@ -619,13 +734,15 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
     return color;
 }
 
-Hit find_closest_hit(Ray ray) {
+Hit find_closest_hit(Ray ray)
+{
     Hit closest_hit;
 
     closest_hit.hit = false;
     closest_hit.distance = INFINITY;
 
-    for (size_t k = 0; k < objects.size(); k++) {
+    for (size_t k = 0; k < objects.size(); k++)
+    {
         Hit hit = objects[k]->intersect(ray);
         if (hit.hit == true && hit.distance > 0.01f && hit.distance < closest_hit.distance)
             closest_hit = hit;
@@ -638,7 +755,8 @@ Hit find_closest_hit(Ray ray) {
  @param ray Ray that should be traced through the scene
  @return Color at the intersection point
  */
-glm::vec3 trace_ray(Ray ray) {
+glm::vec3 trace_ray(Ray ray)
+{
 
     Hit closest_hit = find_closest_hit(ray);
 
@@ -655,7 +773,8 @@ glm::vec3 trace_ray(Ray ray) {
     glm::vec3 normal = closest_hit.normal;
     glm::vec3 point = closest_hit.intersection;
 
-    if (material.refractiveness > 0) {
+    if (material.refractiveness > 0)
+    {
         float index =
             closest_hit.from_outside ? material.refractiveness : 1 / material.refractiveness;
 
@@ -669,7 +788,8 @@ glm::vec3 trace_ray(Ray ray) {
         // color = refractive_component;
     }
 
-    if (material.reflectiveness > 0) {
+    if (material.reflectiveness > 0)
+    {
         glm::vec3 relfective_component(0);
         glm::vec3 reflective_direction = glm::reflect(-view_direction, normal);
         Ray reflective_ray(point + (EPS * reflective_direction), reflective_direction);
@@ -685,7 +805,8 @@ glm::vec3 trace_ray(Ray ray) {
 }
 
 // Decode from disk to raw pixels with a single function call
-PNG_Image_t * decodeOneStep(const char * filename) {
+PNG_Image_t *decodeOneStep(const char *filename)
+{
     std::vector<unsigned char> data; // the raw pixels
     unsigned width, height;
 
@@ -693,13 +814,14 @@ PNG_Image_t * decodeOneStep(const char * filename) {
     unsigned error = lodepng::decode(data, width, height, filename);
 
     // if there's an error, display it
-    if (error) {
+    if (error)
+    {
         std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << "(file: '"
                   << filename << "')" << std::endl;
         return 0;
     }
 
-    PNG_Image_t * image = (PNG_Image_t *)malloc(sizeof(PNG_Image_t));
+    PNG_Image_t *image = (PNG_Image_t *)malloc(sizeof(PNG_Image_t));
     assert(image);
     // printf("png image: %dx%d\n", width, height);
     image->width = width;
@@ -717,7 +839,8 @@ PNG_Image_t * decodeOneStep(const char * filename) {
     return image;
 }
 
-glm::vec3 get_vertex(std::string & line) {
+glm::vec3 get_vertex(std::string &line)
+{
     std::istringstream stream(line);
     float p1, p2, p3;
     std::string v;
@@ -728,36 +851,54 @@ glm::vec3 get_vertex(std::string & line) {
     return glm::vec3(p1, p2, p3);
 }
 
-glm::vec3 get_normals(std::string & line) { return glm::normalize(get_vertex(line)); }
+glm::vec3 get_normals(std::string &line) { return glm::normalize(get_vertex(line)); }
 
-Triangle * get_face(std::string line, std::vector<glm::vec3> vertices,
-                    std::vector<glm::vec3> normals) {
+Fragment *get_face(std::string line, std::vector<glm::vec3> vertices,
+                   std::vector<glm::vec3> normals)
+{
     std::istringstream stream(line);
     string s1, s2, s3, s4;
     std::string f;
-    stream >> f;
-    stream >> s1;
-    stream >> s2;
-    stream >> s3;
-    stream >> s4;
-    int i1, i2, i3, i4;
-    i1 = atoi(s1.substr(0, s1.find('/')).c_str());
-    i2 = atoi(s2.substr(0, s2.find('/')).c_str());
-    i3 = atoi(s3.substr(0, s3.find('/')).c_str());
-    i4 = atoi(s4.substr(0, s4.find('/')).c_str());
-    return normals.size() > 0 ? new Triangle(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1],
-                                             normals[i1 - 1], normals[i2 - 1], normals[i3 - 1])
-                              : new Triangle(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1]);
+    if (std::count(line.begin(), line.end(), ' ') == 3)
+    {
+        stream >> f;
+        stream >> s1;
+        stream >> s2;
+        stream >> s3;
+        int i1, i2, i3;
+        i1 = atoi(s1.substr(0, s1.find('/')).c_str());
+        i2 = atoi(s2.substr(0, s2.find('/')).c_str());
+        i3 = atoi(s3.substr(0, s3.find('/')).c_str());
+        return normals.size() > 0 ? new Triangle(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1],
+                                                 normals[i1 - 1], normals[i2 - 1], normals[i3 - 1])
+                                  : new Triangle(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1]);
+    }
+    else
+    {
+        stream >> f;
+        stream >> s1;
+        stream >> s2;
+        stream >> s3;
+        stream >> s4;
+        int i1, i2, i3, i4;
+        i1 = atoi(s1.substr(0, s1.find('/')).c_str());
+        i2 = atoi(s2.substr(0, s2.find('/')).c_str());
+        i3 = atoi(s3.substr(0, s3.find('/')).c_str());
+        i4 = atoi(s4.substr(0, s4.find('/')).c_str());
+        return new Diamond(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1], vertices[i4 - 1]);
+    }
 }
 
-Mesh * getMeshFromOBJ(std::string filename) {
+Mesh *getMeshFromOBJ(std::string filename)
+{
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
-    std::vector<Triangle *> faces;
+    std::vector<Fragment *> faces;
 
     std::ifstream file(filename);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(file, line))
+    {
         if (line[0] == '#')
             continue;
 
@@ -777,7 +918,8 @@ Mesh * getMeshFromOBJ(std::string filename) {
 /**
  Function defining the scene
  */
-void sceneDefinition() {
+void sceneDefinition()
+{
 
     Material green_diffuse;
     green_diffuse.ambient = glm::vec3(0.03f, 0.1f, 0.03f);
@@ -797,10 +939,10 @@ void sceneDefinition() {
     // blue_specular.reflectiveness = .9f;
 
     Material highly_specular_yellow;
-        highly_specular_yellow.ambient = glm::vec3(0.1f, 0.1f, 0.03f);
-        highly_specular_yellow.diffuse = glm::vec3(.6f, .6f, 0.1f);
-        highly_specular_yellow.specular = glm::vec3(.6f);
-        highly_specular_yellow.shininess = 100;
+    highly_specular_yellow.ambient = glm::vec3(0.1f, 0.1f, 0.03f);
+    highly_specular_yellow.diffuse = glm::vec3(.6f, .6f, 0.1f);
+    highly_specular_yellow.specular = glm::vec3(.6f);
+    highly_specular_yellow.shininess = 100;
 
     glm::vec3 p1(0, 0, -1), p2(-1, 0, 0), p3(1, 0, 0), p4(0, 1, 0);
     glm::vec3 n1(cross(p3 - p1, p2 - p1)), n2(cross(p2 - p1, p4 - p1)), n3(cross(p4 - p1, p3 - p1)),
@@ -815,37 +957,37 @@ void sceneDefinition() {
              *t3 = new Triangle(p1, p4, p3, n3, n3, n3, blue_specular),
              *t4 = new Triangle(p3, p4, p2, n4, n4, n4, highly_specular_yellow);
 
-    std::vector<Triangle *> triangles;
+    std::vector<Fragment *> triangles;
     triangles.push_back(t1);
     triangles.push_back(t2);
     triangles.push_back(t3);
     triangles.push_back(t4);
-    Mesh * pyramid = new Mesh(triangles);
+    Mesh *pyramid = new Mesh(triangles);
 
-    glm::mat4 pyr_translation = glm::translate(glm::vec3(0, 0, 10));
+    glm::mat4 pyr_translation = glm::translate(glm::vec3(0, -10, 15));
     glm::mat4 pyr_rotate = glm::rotate(.7f, glm::vec3(0, 1, 0));
     glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 1, 1));
     pyramid->setTransformation(pyr_translation * pyr_rotate * pyr_scale);
-    objects.push_back(pyramid);
+    // objects.push_back(pyramid);
 
-    Mesh * teapot = getMeshFromOBJ("teapot.obj");
+    Mesh *teapot = getMeshFromOBJ("teapot.obj");
     teapot->setMaterial(red_specular);
     glm::mat4 teapotTransformation = glm::translate(glm::vec3(0, 1, 10));
     teapot->setTransformation(teapotTransformation);
-    Box * teapotBox = new Box(teapot->getMinCoords(), teapot->getMaxCoords(), teapot);
+    Box *teapotBox = new Box(teapot->getMinCoords(), teapot->getMaxCoords(), teapot);
     // Box * teapotBox = new Box(glm::vec3(-3, 0, -2), glm::vec3(5, 5, 3), teapot);
     teapotBox->setMaterial(blue_specular);
     teapotBox->setTransformation(teapotTransformation);
     // objects.push_back(teapotBox);
 
-    Mesh * seashell = getMeshFromOBJ("shell.obj");
+    Mesh *seashell = getMeshFromOBJ("shell.obj");
     seashell->setMaterial(red_specular);
     glm::mat4 seashellTransformation = glm::translate(glm::vec3(0, -10, 15)) * glm::scale(glm::vec3(.2));
     seashell->setTransformation(seashellTransformation);
-    Box * seashellBox = new Box(seashell->getMinCoords(), seashell->getMaxCoords(), seashell);
+    Box *seashellBox = new Box(seashell->getMinCoords(), seashell->getMaxCoords(), seashell);
     seashellBox->setTransformation(seashellTransformation);
     printf("min: %s, max: %s\n", glm::to_string(seashellBox->getMinCoords()).c_str(), glm::to_string(seashellBox->getMaxCoords()).c_str());
-    // objects.push_back(seashellBox);
+    objects.push_back(seashellBox);
     // objects.push_back(t1);
     // objects.push_back(t2);
     // objects.push_back(t3);
@@ -855,26 +997,26 @@ void sceneDefinition() {
     refractive.reflectiveness = 0.1f;
     refractive.refractiveness = 2.0f;
 
-    Sphere * blue_sphere = new Sphere(blue_specular);
+    Sphere *blue_sphere = new Sphere(blue_specular);
     blue_sphere->setTransformation(glm::translate(glm::vec3(1, -2, 8)));
     // objects.push_back(blue_sphere);
-    Sphere * red_sphere = new Sphere(red_specular);
+    Sphere *red_sphere = new Sphere(red_specular);
     red_sphere->setTransformation(
         glm::scale(glm::translate(glm::vec3(-1, -2.5, 6)), glm::vec3(.5)));
     // objects.push_back(red_sphere);
 
-    Sphere * refractive_sphere = new Sphere(refractive);
+    Sphere *refractive_sphere = new Sphere(refractive);
     refractive_sphere->setTransformation(glm::translate(glm::vec3(-3, -1, 8)) *
                                          glm::scale(glm::vec3(2)));
     // objects.push_back(refractive_sphere);
 
     // Textured sphere
     Material stone_textured;
-        stone_textured.specular = glm::vec3(.6f);
-        stone_textured.shininess = 100;
+    stone_textured.specular = glm::vec3(.6f);
+    stone_textured.shininess = 100;
     Material waffle_textured;
-        waffle_textured.specular = glm::vec3(.6f);
-        waffle_textured.shininess = 100;
+    waffle_textured.specular = glm::vec3(.6f);
+    waffle_textured.shininess = 100;
 
     Material water_textured;
     water_textured.specular = glm::vec3(.9f);
@@ -882,28 +1024,28 @@ void sceneDefinition() {
     water_textured.refractiveness = .825f;
 
     Material sand_textured;
-        sand_textured.specular = glm::vec3(.2f);
-        sand_textured.shininess = 100;
+    sand_textured.specular = glm::vec3(.2f);
+    sand_textured.shininess = 100;
     // textured.texture = &rainbowTexture;
-    Texture * sandImageTexture = new ImageTexture(
+    Texture *sandImageTexture = new ImageTexture(
         *decodeOneStep("./textures/png/Sand_005_baseColor.png"),
         *decodeOneStep("./textures/png/Sand_005_height.png"),
         *decodeOneStep("./textures/png/Sand_005_normal.png"),
         *decodeOneStep("./textures/png/Sand_005_ambientOcclusion.png"),
         *decodeOneStep("./textures/png/Sand_005_roughness.png"));
-    Texture * waterImageTexture = new ImageTexture(
+    Texture *waterImageTexture = new ImageTexture(
         *decodeOneStep("./textures/png/Water_002_COLOR.png"),
         *decodeOneStep("./textures/png/Water_002_DISP.png"),
         *decodeOneStep("./textures/png/Water_002_NORM.png"),
-        *decodeOneStep("./textures/png/Water_002_OCC.png"), 
+        *decodeOneStep("./textures/png/Water_002_OCC.png"),
         *decodeOneStep("./textures/png/Water_002_ROUGH.png"));
-    Texture * stoneImageTexture = new ImageTexture(
+    Texture *stoneImageTexture = new ImageTexture(
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_basecolor.png"),
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_height.png"),
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_normal.png"),
-        *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_ambientOcclusion.png"), 
+        *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_ambientOcclusion.png"),
         *decodeOneStep("./textures/png/Stylized_Stone_Floor_005_roughness.png"));
-    Texture * waffleImageTexture = new ImageTexture(
+    Texture *waffleImageTexture = new ImageTexture(
         *decodeOneStep("./textures/png/Waffle_001_basecolor.png"),
         *decodeOneStep("./textures/png/Waffle_001_height.png"),
         *decodeOneStep("./textures/png/Waffle_001_normal.png"),
@@ -913,9 +1055,9 @@ void sceneDefinition() {
     waffle_textured.texture = waffleImageTexture;
     water_textured.texture = waterImageTexture;
     sand_textured.texture = sandImageTexture;
-    Sphere * waffle_sphere = new Sphere(waffle_textured);
-    Sphere * water_sphere = new Sphere(water_textured);
-    Sphere * stone_sphere = new Sphere(stone_textured);
+    Sphere *waffle_sphere = new Sphere(waffle_textured);
+    Sphere *water_sphere = new Sphere(water_textured);
+    Sphere *stone_sphere = new Sphere(stone_textured);
     // rainbow_sphere->setTransformation(glm::rotate(glm::translate(glm::vec3(-6,4,23)), .2f,
     // glm::vec3(0, 1, 0)));
     glm::mat4 translation = glm::translate(glm::vec3(0, 1.5, 10));
@@ -951,7 +1093,7 @@ void sceneDefinition() {
         glm::translate(glm::vec3(6, -3, 7)) * glm::rotate((float)glm::atan(3), glm::vec3(0, 0, 1)),
         glm::vec3(1, 3, 1));
 
-    Cone * cone1 = new Cone(green_diffuse);
+    Cone *cone1 = new Cone(green_diffuse);
     cone1->setTransformation(green_cone_trans);
     // objects.push_back(cone1);
 
@@ -959,7 +1101,7 @@ void sceneDefinition() {
         glm::scale(glm::translate(glm::vec3(-5, 9, 14)) * glm::rotate(3.1415f, glm::vec3(0, 0, 1)),
                    glm::vec3(3, 12, 3));
 
-    Cone * cone2 = new Cone(highly_specular_yellow);
+    Cone *cone2 = new Cone(highly_specular_yellow);
     cone2->setTransformation(yellow_cone_trans);
     // objects.push_back(cone2);
 
@@ -973,14 +1115,16 @@ void sceneDefinition() {
  @param intensity Input intensity
  @return Tonemapped intensity in range (0,1)
  */
-glm::vec3 toneMapping(glm::vec3 intensity) {
+glm::vec3 toneMapping(glm::vec3 intensity)
+{
     float gamma = 1.0 / 1.8;
     float alpha = 18.0f;
     // return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
     return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
 }
 
-int main(int argc, const char * argv[]) {
+int main(int argc, const char *argv[])
+{
 
     clock_t t = clock(); // variable for keeping the time of the rendering
 
@@ -1000,29 +1144,30 @@ int main(int argc, const char * argv[]) {
     uint subpixel_weights[] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
 
     cout << "Coloratin each pixel on the screne..." << endl;
-    glm::vec3 origin(0, 2, 0);
+    glm::vec3 origin(0, 10, 0);
     for (int i = 0; i < width; i++)
-        for (int j = 0; j < height; j++) {
+        for (int j = 0; j < height; j++)
+        {
 
             float dz = 1;
             // top left of the pixel
-            float dx = X + i * s; 
+            float dx = X + i * s;
             float dy = Y - j * s;
             glm::vec3 color(0);
-            for (int k = 0; k < 9; ++k) {
-                float tmp_dx = dx + ( k%3 )* s/2;
-                float tmp_dy = dy - ( (int) (k/3) )* s/2;
+            for (int k = 0; k < 9; ++k)
+            {
+                float tmp_dx = dx + (k % 3) * s / 2;
+                float tmp_dy = dy - ((int)(k / 3)) * s / 2;
 
                 glm::vec3 direction(tmp_dx, tmp_dy, dz);
-                // direction += glm::vec3(0, -1.5, 0);
+                direction += glm::vec3(0, -1.5, 0);
                 direction = glm::normalize(direction);
 
                 Ray ray(origin, direction);
-                color += (float) subpixel_weights[k] * trace_ray(ray);
+                color += (float)subpixel_weights[k] * trace_ray(ray);
             }
             color /= 16.f;
             image.setPixel(i, j, toneMapping(color));
-
         }
 
     t = clock() - t;
@@ -1031,9 +1176,12 @@ int main(int argc, const char * argv[]) {
          << endl;
 
     // Writing the final results of the rendering
-    if (argc == 2) {
+    if (argc == 2)
+    {
         image.writeImage(argv[1]);
-    } else {
+    }
+    else
+    {
         image.writeImage("./result.ppm");
     }
 
