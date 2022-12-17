@@ -818,7 +818,7 @@ void sceneDefinition() {
     glm::mat4 pyr_rotate = glm::rotate(.7f, glm::vec3(0, 1, 0));
     glm::mat4 pyr_scale = glm::scale(glm::vec3(1, 1, 1));
     pyramid->setTransformation(pyr_translation * pyr_rotate * pyr_scale);
-    // objects.push_back(pyramid);
+    objects.push_back(pyramid);
 
     Mesh * teapot = getMeshFromOBJ("teapot.obj");
     teapot->setMaterial(red_specular);
@@ -837,7 +837,7 @@ void sceneDefinition() {
     Box * seashellBox = new Box(seashell->getMinCoords(), seashell->getMaxCoords(), seashell);
     seashellBox->setTransformation(seashellTransformation);
     printf("min: %s, max: %s\n", glm::to_string(seashellBox->getMinCoords()).c_str(), glm::to_string(seashellBox->getMaxCoords()).c_str());
-    objects.push_back(seashellBox);
+    // objects.push_back(seashellBox);
     // objects.push_back(t1);
     // objects.push_back(t2);
     // objects.push_back(t3);
@@ -989,22 +989,32 @@ int main(int argc, const char * argv[]) {
     float X = -s * width / 2;
     float Y = s * height / 2;
 
+    uint subpixel_weights[] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
+
     cout << "Coloratin each pixel on the screne..." << endl;
+    glm::vec3 origin(0, 2, 0);
     for (int i = 0; i < width; i++)
         for (int j = 0; j < height; j++) {
 
-            float dx = X + i * s + s / 2;
-            float dy = Y - j * s - s / 2;
             float dz = 1;
+            // top left of the pixel
+            float dx = X + i * s; 
+            float dy = Y - j * s;
+            glm::vec3 color(0);
+            for (int k = 0; k < 9; ++k) {
+                float tmp_dx = dx + ( k%3 )* s/2;
+                float tmp_dy = dy - ( (int) (k/3) )* s/2;
 
-            glm::vec3 origin(0, 10, 0);
-            glm::vec3 direction(dx, dy, dz);
-            direction += glm::vec3(0, -1.5, 0);
-            direction = glm::normalize(direction);
+                glm::vec3 direction(tmp_dx, tmp_dy, dz);
+                // direction += glm::vec3(0, -1.5, 0);
+                direction = glm::normalize(direction);
 
-            Ray ray(origin, direction);
+                Ray ray(origin, direction);
+                color += (float) subpixel_weights[k] * trace_ray(ray);
+            }
+            color /= 16.f;
+            image.setPixel(i, j, toneMapping(color));
 
-            image.setPixel(i, j, toneMapping(trace_ray(ray)));
         }
 
     t = clock() - t;
