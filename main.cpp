@@ -503,25 +503,31 @@ class Box : public Object {
         glm::vec3 E(v1.x, v1.y, v2.z);
         glm::vec3 F(v2.x, v1.y, v2.z);
         glm::vec3 H(v1.x, v2.y, v2.z);
-        triangles = {
-            Triangle(B, A, D), Triangle(C, B, D),
+            triangles[0] = Triangle(B, A, D);
+            triangles[1] = Triangle(C, B, D);
 
-            Triangle(F, B, C), Triangle(G, F, C),
+            triangles[2] = Triangle(F, B, C);
+            triangles[3] = Triangle(G, F, C);
 
-            Triangle(E, F, G), Triangle(H, E, G),
+            triangles[4] = Triangle(E, F, G);
+            triangles[5] = Triangle(H, E, G);
 
-            Triangle(A, E, H), Triangle(D, A, H),
+            triangles[6] = Triangle(A, E, H);
+            triangles[7] = Triangle(D, A, H);
 
-            Triangle(C, D, H), Triangle(G, C, H),
+            triangles[8] = Triangle(C, D, H);
+            triangles[9] = Triangle(G, C, H);
 
-            Triangle(F, E, A), Triangle(B, F, A),
-        };
+            triangles[10] = Triangle(F, E, A);;
+            triangles[11] = Triangle(B, F, A);
     }
 
     glm::vec3 getMinCoords() { return transformationMatrix * glm::vec4(v1, 1); }
     glm::vec3 getMaxCoords() { return transformationMatrix * glm::vec4(v2, 1); }
     Hit intersect(Ray ray) {
-        Hit hit{.hit = false, .distance = INFINITY};
+        Hit hit;
+        hit.hit = false;
+        hit.distance = INFINITY;
 
         glm::vec3 d = inverseTransformationMatrix * glm::vec4(ray.direction, 0);
         glm::vec3 o = inverseTransformationMatrix * glm::vec4(ray.origin, 1);
@@ -697,11 +703,9 @@ PNG_Image_t * decodeOneStep(const char * filename) {
     if (!image)
         return 0;
     // printf("png image: %dx%d\n", width, height);
-    *image = {
-        .width = width,
-        .height = height,
-        .data = data,
-    };
+    image->width = width;
+    image->height = height;
+    image->data = data;
 
     // the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as
     // texture, draw it, ...
