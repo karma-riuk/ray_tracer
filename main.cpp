@@ -326,8 +326,7 @@ class Cone : public Object {
     }
 };
 
-class Fragment : public Object {
-};
+class Fragment : public Object {};
 
 class Triangle : public Fragment {
 
@@ -388,9 +387,7 @@ class Triangle : public Fragment {
         sign1 = glm::sign(glm::dot(sn1, sn));
         sign2 = glm::sign(glm::dot(sn2, sn));
         sign3 = glm::sign(glm::dot(sn3, sn));
-        // printf("sign 1: %f, sign 2: %f, sign 2: %f...", sign1, sign2, sign3);
         if (sign1 < 0 || sign2 < 0 || sign3 < 0) {
-            // printf("aborted\n");
             return hit; // not hit
         }
 
@@ -398,6 +395,7 @@ class Triangle : public Fragment {
         hit.intersection = p;
 
         hit.normal = glm::normalize(length(sn1) * n1 + length(sn2) * n2 + length(sn3) * n3);
+        // hit.normal = glm::normalize(n1);
         hit.distance = plane_hit.distance;
         hit.object = (Fragment *)this;
         float W = length(sn);
@@ -417,6 +415,11 @@ class Diamond : public Fragment {
     Diamond(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 p4) {
         t1 = new Triangle(p1, p2, p4);
         t2 = new Triangle(p2, p3, p4);
+    }
+    Diamond(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 p4, glm::vec3 n1, glm::vec3 n2,
+            glm::vec3 n3, glm::vec3 n4) {
+        t1 = new Triangle(p1, p2, p4, n1, n2, n4);
+        t2 = new Triangle(p2, p3, p4, n2, n3, n4);
     }
 
     glm::vec3 getMinCoords() override {
@@ -778,6 +781,17 @@ glm::vec3 get_vertex(std::string & line) {
 
 glm::vec3 get_normals(std::string & line) { return glm::normalize(get_vertex(line)); }
 
+std::vector<std::string> split(std::string s, char c) {
+    std::stringstream test(s);
+    std::string segment;
+    std::vector<std::string> seglist;
+
+    while (std::getline(test, segment, c)) {
+        seglist.push_back(segment);
+    }
+    return seglist;
+}
+
 Fragment * get_face(std::string line, std::vector<glm::vec3> vertices,
                     std::vector<glm::vec3> normals) {
     std::istringstream stream(line);
@@ -802,12 +816,28 @@ Fragment * get_face(std::string line, std::vector<glm::vec3> vertices,
         stream >> s2;
         stream >> s3;
         stream >> s4;
-        int i1, i2, i3, i4;
-        i1 = atoi(s1.substr(0, s1.find('/')).c_str());
-        i2 = atoi(s2.substr(0, s2.find('/')).c_str());
-        i3 = atoi(s3.substr(0, s3.find('/')).c_str());
-        i4 = atoi(s4.substr(0, s4.find('/')).c_str());
-        return new Diamond(vertices[i1 - 1], vertices[i2 - 1], vertices[i3 - 1], vertices[i4 - 1]);
+        int v1, v2, v3, v4;
+        int n1, n2, n3, n4;
+
+        std::vector<std::string> s1_split = split(s1, '/');
+        v1 = atoi(s1_split[0].c_str()) - 1;
+        n1 = atoi(s1_split[2].c_str()) - 1;
+
+        std::vector<std::string> s2_split = split(s2, '/');
+        v2 = atoi(s2_split[0].c_str()) - 1;
+        n2 = atoi(s2_split[2].c_str()) - 1;
+
+        std::vector<std::string> s3_split = split(s3, '/');
+        v3 = atoi(s3_split[0].c_str()) - 1;
+        n3 = atoi(s3_split[2].c_str()) - 1;
+
+        std::vector<std::string> s4_split = split(s4, '/');
+        v4 = atoi(s4_split[0].c_str()) - 1;
+        n4 = atoi(s4_split[2].c_str()) - 1;
+        return normals.size() > 0
+                   ? new Diamond(vertices[v1], vertices[v2], vertices[v3], vertices[v4],
+                                  normals[n1],  normals[n2],  normals[n3],  normals[n4])
+                   : new Diamond(vertices[v1], vertices[v2], vertices[v3], vertices[v4]); // does not work
     }
 }
 
@@ -899,15 +929,15 @@ void sceneDefinition() {
     teapotBox->setTransformation(teapotTransformation);
     // objects.push_back(teapotBox);
 
-    Mesh * seashell = getMeshFromOBJ("shell.obj");
+    Mesh * seashell = getMeshFromOBJ("seashell_obj.obj");
+    // Mesh * seashell = getMeshFromOBJ("shell.obj");
     seashell->setMaterial(red_specular);
-    glm::mat4 seashellTransformation =
-        glm::translate(glm::vec3(0, -5, 10)) * glm::scale(glm::vec3(.2));
+    glm::mat4 seashellTransformation = glm::translate(glm::vec3(0, .5, 3)) *
+                                       glm::rotate((float) M_PI_4, glm::vec3(0, -1, 1)) *
+                                       glm::scale(glm::vec3(.02));
     seashell->setTransformation(seashellTransformation);
     Box * seashellBox = new Box(seashell->getMinCoords(), seashell->getMaxCoords(), seashell);
     seashellBox->setTransformation(seashellTransformation);
-    printf("min: %s, max: %s\n", glm::to_string(seashellBox->getMinCoords()).c_str(),
-           glm::to_string(seashellBox->getMaxCoords()).c_str());
     objects.push_back(seashellBox);
     // objects.push_back(t1);
     // objects.push_back(t2);
@@ -1044,19 +1074,21 @@ glm::vec3 toneMapping(glm::vec3 intensity) {
     return glm::clamp(alpha * glm::pow(intensity, glm::vec3(gamma)), 0.0f, 1.0f);
 }
 
-
 long N_PIXELS;
 
-void print_progress_bar(int pixel){
-    float progress = (float) pixel / N_PIXELS;
+void print_progress_bar(int pixel) {
+    float progress = (float)pixel / N_PIXELS;
     int barWidth = 70;
 
     std::cout << "[";
     int pos = barWidth * progress;
     for (int i = 0; i < barWidth; ++i) {
-        if (i < pos) std::cout << "=";
-        else if (i == pos) std::cout << ">";
-        else std::cout << " ";
+        if (i < pos)
+            std::cout << "=";
+        else if (i == pos)
+            std::cout << ">";
+        else
+            std::cout << " ";
     }
     // std::cout << "] " << int(progress * 100.0) << " %\r";
     printf("] %.2f %%\r", progress * 100);
@@ -1078,18 +1110,17 @@ int main(int argc, const char * argv[]) {
     Image image(width, height); // Create an image where we will store the result
 #ifdef ANTI_ALIASING
     cout << "Anti aliasing" << endl;
-    N_PIXELS *= 9;
+    // N_PIXELS *= 9;
+    uint subpixel_weights[] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
 #endif
 
     float s = 2 * tan(0.5 * fov / 180 * M_PI) / width;
     float X = -s * width / 2;
     float Y = s * height / 2;
 
-    uint subpixel_weights[] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
-
     cout << "Coloratin each pixel on the screne..." << endl;
-    glm::vec3 origin(0, 10, 0);
-    for (int i = 0; i < width; i++){
+    glm::vec3 origin(0, 1, 0);
+    for (int i = 0; i < width; i++) {
 
         for (int j = 0; j < height; j++) {
 
@@ -1104,7 +1135,7 @@ int main(int argc, const char * argv[]) {
                 float tmp_dy = dy - ((int)(k / 3)) * s / 2;
 
                 glm::vec3 direction(tmp_dx, tmp_dy, dz);
-                direction += glm::vec3(0, -1.5, 0);
+                // direction += glm::vec3(0, -1.5, 0);
                 direction = glm::normalize(direction);
 
                 Ray ray(origin, direction);
@@ -1117,14 +1148,14 @@ int main(int argc, const char * argv[]) {
             float dx = X + i * s + s / 2;
             float dy = Y - j * s + s / 2;
             glm::vec3 direction(dx, dy, dz);
-            direction += glm::vec3(0, -1.5, 0);
+            // direction += glm::vec3(0, -1.5, 0);
             Ray ray(origin, direction);
             glm::vec3 color = trace_ray(ray);
             // print_progress_bar(i * height + j);
 #endif
             image.setPixel(i, j, toneMapping(color));
         }
-        print_progress_bar((i+1) * height);
+        print_progress_bar((i + 1) * height);
     }
 
     t = clock() - t;

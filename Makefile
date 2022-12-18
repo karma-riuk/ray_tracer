@@ -1,4 +1,5 @@
 CXXFLAGS = -Wall -O3
+# CXXFLAGS = -Wall -O3 -DANTI_ALIASING
 SOURCE_FILES = Textures.cpp Image.cpp lib/lodepng/lodepng.cpp
 OBJS = $(SOURCE_FILES:%.cpp=objects/%.o)
 
