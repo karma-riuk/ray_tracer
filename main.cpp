@@ -1,7 +1,6 @@
 /**
 @file main.cpp
 */
-
 #include "glm/glm.hpp"
 #include "glm/gtx/string_cast.hpp"
 #include "glm/gtx/transform.hpp"
@@ -206,7 +205,7 @@ class Plane : public Object {
 
   public:
     void computeBaseVectors() {
-        b1 = .1f * computeB1(normal);
+        b1 = .05f * computeB1(normal);
         b2 = .1f * glm::cross(normal, b1);
     }
 
@@ -333,6 +332,7 @@ class Triangle : public Fragment {
   private:
     glm::vec3 p1, p2, p3;
     glm::vec3 n1, n2, n3;
+    glm::vec2 uv1, uv2, uv3;
 
   public:
     Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) : p1(p1), p2(p2), p3(p3) {
@@ -341,6 +341,9 @@ class Triangle : public Fragment {
 
     Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3)
         : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {}
+    Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3,
+             glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3)
+        : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3), uv1(uv1), uv2(uv2), uv3(uv3) {}
     Triangle(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 n1, glm::vec3 n2, glm::vec3 n3,
              Material material)
         : p1(p1), p2(p2), p3(p3), n1(n1), n2(n2), n3(n3) {
@@ -394,16 +397,28 @@ class Triangle : public Fragment {
         hit.hit = true;
         hit.intersection = p;
 
-        hit.normal = glm::normalize(length(sn1) * n1 + length(sn2) * n2 + length(sn3) * n3);
+        hit.normal = glm::normalize(interpolate(sn1, sn2, sn3, n1, n2, n3));
         // hit.normal = glm::normalize(n1);
         hit.distance = plane_hit.distance;
         hit.object = (Fragment *)this;
         float W = length(sn);
-        hit.uv = glm::vec2(length(sn1) / W, length(sn2) / W);
-        // hit.from_outside = dot(hit.normal, ray.direction) < 0;
-        hit.from_outside = true;
+
+        if (glm::length(uv1) > 0) {
+            glm::vec3 interpolated = interpolate(sn1 / W, sn2 / W, sn3 / W, glm::vec3(uv1, 0),
+                                                 glm::vec3(uv2, 0), glm::vec3(uv3, 0));
+            hit.uv = interpolated;
+            // hit.uv = uv1;
+        } else
+            hit.uv = glm::vec2(length(sn1) / W, length(sn2) / W);
+        hit.from_outside = dot(hit.normal, ray.direction) < 0;
+        // hit.from_outside = true;
 
         return hit;
+    }
+
+    glm::vec3 interpolate(glm::vec3 sn1, glm::vec3 sn2, glm::vec3 sn3, glm::vec3 v1, glm::vec3 v2,
+                          glm::vec3 v3) {
+        return length(sn1) * v1 + length(sn2) * v2 + length(sn3) * v3;
     }
 };
 
@@ -420,6 +435,12 @@ class Diamond : public Fragment {
             glm::vec3 n3, glm::vec3 n4) {
         t1 = new Triangle(p1, p2, p4, n1, n2, n4);
         t2 = new Triangle(p2, p3, p4, n2, n3, n4);
+    }
+    Diamond(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 p4, glm::vec3 n1, glm::vec3 n2,
+            glm::vec3 n3, glm::vec3 n4, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3,
+            glm::vec2 uv4) {
+        t1 = new Triangle(p1, p2, p4, n1, n2, n4, uv1, uv2, uv4);
+        t2 = new Triangle(p2, p3, p4, n2, n3, n4, uv2, uv3, uv4);
     }
 
     glm::vec3 getMinCoords() override {
@@ -655,6 +676,7 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
         }
 
         glm::vec3 specular = material.specular * glm::vec3(pow(VdotR, shininess));
+        // glm::vec3 specular = glm::vec3(0);
 
         // distance to the light
         float r = glm::distance(point, lights[light_num]->position);
@@ -663,9 +685,11 @@ glm::vec3 PhongModel(glm::vec3 point, glm::vec3 normal, glm::vec2 uv, glm::vec3 
         color += lights[light_num]->color * (diffuse + specular) * 1.3f / r / r;
     }
 
-    color = glm::clamp(color, glm::vec3(0.0), glm::vec3(1.0));
     if (isType<ImageTexture>(material.texture))
         color *= ((ImageTexture *)material.texture)->occlusion(uv);
+    else
+        color *= 4;
+    color *= 2;
 
     return color;
 }
@@ -678,7 +702,7 @@ Hit find_closest_hit(Ray ray) {
 
     for (size_t k = 0; k < objects.size(); k++) {
         Hit hit = objects[k]->intersect(ray);
-        if (hit.hit == true && hit.distance > 0.01f && hit.distance < closest_hit.distance)
+        if (hit.hit == true && hit.from_outside && hit.distance > 0.01f && hit.distance < closest_hit.distance)
             closest_hit = hit;
     }
     return closest_hit;
@@ -700,6 +724,7 @@ glm::vec3 trace_ray(Ray ray) {
 
     color = PhongModel(closest_hit.intersection, closest_hit.normal, closest_hit.uv,
                        glm::normalize(-ray.direction), closest_hit.object->getMaterial());
+    // cout << glm::to_string(color) << endl;
 
     Material material = closest_hit.object->getMaterial();
     glm::vec3 view_direction = glm::vec3(-ray.direction);
@@ -715,8 +740,8 @@ glm::vec3 trace_ray(Ray ray) {
 
         Ray refraction_ray(point + (EPS * refraction_direction), refraction_direction);
         glm::vec3 refractive_component = trace_ray(refraction_ray);
-        color = (1 - material.refractiveness) * color +
-                (material.refractiveness * refractive_component);
+        color = (material.refractive_ratio) * color +
+                (1.f - material.refractive_ratio) * refractive_component;
         // color = refractive_component;
     }
 
@@ -730,7 +755,7 @@ glm::vec3 trace_ray(Ray ray) {
         color = (1 - material.reflectiveness) * color +
                 (material.reflectiveness * relfective_component);
     }
-    color *= 2;
+    // color *= 2;
 
     return color;
 }
@@ -779,6 +804,16 @@ glm::vec3 get_vertex(std::string & line) {
     return glm::vec3(p1, p2, p3);
 }
 
+glm::vec2 get_vt(std::string line) {
+    std::istringstream stream(line);
+    float p1, p2;
+    std::string vt;
+    stream >> vt;
+    stream >> p1;
+    stream >> p2;
+    return glm::vec2(p1, p2);
+}
+
 glm::vec3 get_normals(std::string & line) { return glm::normalize(get_vertex(line)); }
 
 std::vector<std::string> split(std::string s, char c) {
@@ -793,7 +828,7 @@ std::vector<std::string> split(std::string s, char c) {
 }
 
 Fragment * get_face(std::string line, std::vector<glm::vec3> vertices,
-                    std::vector<glm::vec3> normals) {
+                    std::vector<glm::vec3> normals, std::vector<glm::vec2> vertex_textures) {
     std::istringstream stream(line);
     string s1, s2, s3, s4;
     std::string f;
@@ -817,32 +852,41 @@ Fragment * get_face(std::string line, std::vector<glm::vec3> vertices,
         stream >> s3;
         stream >> s4;
         int v1, v2, v3, v4;
+        int vt1, vt2, vt3, vt4;
         int n1, n2, n3, n4;
 
         std::vector<std::string> s1_split = split(s1, '/');
         v1 = atoi(s1_split[0].c_str()) - 1;
+        vt1 = atoi(s1_split[1].c_str()) - 1;
         n1 = atoi(s1_split[2].c_str()) - 1;
 
         std::vector<std::string> s2_split = split(s2, '/');
         v2 = atoi(s2_split[0].c_str()) - 1;
+        vt2 = atoi(s2_split[1].c_str()) - 1;
         n2 = atoi(s2_split[2].c_str()) - 1;
 
         std::vector<std::string> s3_split = split(s3, '/');
         v3 = atoi(s3_split[0].c_str()) - 1;
+        vt3 = atoi(s3_split[1].c_str()) - 1;
         n3 = atoi(s3_split[2].c_str()) - 1;
 
         std::vector<std::string> s4_split = split(s4, '/');
         v4 = atoi(s4_split[0].c_str()) - 1;
+        vt4 = atoi(s4_split[1].c_str()) - 1;
         n4 = atoi(s4_split[2].c_str()) - 1;
         return normals.size() > 0
                    ? new Diamond(vertices[v1], vertices[v2], vertices[v3], vertices[v4],
-                                  normals[n1],  normals[n2],  normals[n3],  normals[n4])
-                   : new Diamond(vertices[v1], vertices[v2], vertices[v3], vertices[v4]); // does not work
+                                 normals[n1], normals[n2], normals[n3], normals[n4],
+                                 vertex_textures[vt1], vertex_textures[vt2], vertex_textures[vt3],
+                                 vertex_textures[vt4])
+                   : new Diamond(vertices[v1], vertices[v2], vertices[v3],
+                                 vertices[v4]); // does not work
     }
 }
 
 Mesh * getMeshFromOBJ(std::string filename) {
     std::vector<glm::vec3> vertices;
+    std::vector<glm::vec2> vertex_textures;
     std::vector<glm::vec3> normals;
     std::vector<Fragment *> faces;
 
@@ -855,11 +899,14 @@ Mesh * getMeshFromOBJ(std::string filename) {
         if (line[0] == 'v')
             vertices.push_back(get_vertex(line));
 
+        if (line.substr(0, 2) == "vt")
+            vertex_textures.push_back(get_vt(line));
+
         if (line.substr(0, 2) == "vn")
             normals.push_back(get_normals(line));
 
         if (line[0] == 'f')
-            faces.push_back(get_face(line, vertices, normals));
+            faces.push_back(get_face(line, vertices, normals, vertex_textures));
     }
 
     return new Mesh(faces);
@@ -929,20 +976,83 @@ void sceneDefinition() {
     teapotBox->setTransformation(teapotTransformation);
     // objects.push_back(teapotBox);
 
+    // Mesh * pyramid2 = new Mesh(triangles);
+    // pyramid2->setTransformation(seashellTransformation);
+    // objects.push_back(pyramid2);
+    // pyramid->setTransformation(seashellTransformation);
+    // objects.push_back(pyramid);
+
+    Material shell_textured;
+    // shell_textured.specular = glm::vec3(.9f);
+    shell_textured.ambient = glm::vec3(0.01f, 0.02f, 0.02f);
+    shell_textured.diffuse = glm::vec3(0.8f, 0.2f, 0.2f);
+    // shell_textured.diffuse = glm::vec3(.6f, 0.4f, 0.3f);
+    shell_textured.specular = glm::vec3(0.5);
+    shell_textured.shininess = 10.0;
+    float angle = atan(-3);
     Mesh * seashell = getMeshFromOBJ("seashell_obj.obj");
     // Mesh * seashell = getMeshFromOBJ("shell.obj");
-    seashell->setMaterial(red_specular);
-    glm::mat4 seashellTransformation = glm::translate(glm::vec3(0, .5, 3)) *
-                                       glm::rotate((float) M_PI_4, glm::vec3(0, -1, 1)) *
-                                       glm::scale(glm::vec3(.02));
-    seashell->setTransformation(seashellTransformation);
+
+    seashell->setMaterial(shell_textured);
+
+    glm::mat4 seashellTransformation = glm::translate(glm::vec3(-10, 5, 24.7)) *
+                                       glm::rotate(angle, glm::vec3(1, 0, 0)) *
+                                       glm::scale(glm::vec3(0.15));
+                                       // glm::scale(glm::vec3(6));
     Box * seashellBox = new Box(seashell->getMinCoords(), seashell->getMaxCoords(), seashell);
+    seashell->setTransformation(seashellTransformation);
     seashellBox->setTransformation(seashellTransformation);
+
+    //
+    // Mesh * seashell2 = getMeshFromOBJ("shell.obj");
+    // Box * seashellBox2 = new Box(seashell2->getMinCoords(), seashell2->getMaxCoords(), seashell2);
+    // glm::mat4 seashellTransformation2 = glm::translate(glm::vec3(10, -8, 16.7)) *
+    //                          glm::rotate(angle, glm::vec3(1, -.5, 0)) *
+    //                          glm::scale(glm::vec3(1));
+    //                          // glm::scale(glm::vec3(6));
+    // seashell2->setMaterial(shell_textured);
+    // seashell2->setTransformation(seashellTransformation2);
+    // seashellBox2->setTransformation(seashellTransformation2);
+
+    Mesh * seashell3 = getMeshFromOBJ("shell.obj");
+    Box * seashellBox3 = new Box(seashell3->getMinCoords(), seashell3->getMaxCoords(), seashell3);
+    glm::mat4 seashellTransformation3 =  glm::translate(glm::vec3(9, -8, 16.7)) *
+                             glm::rotate(angle, glm::vec3(1, .5, 0)) *
+                             glm::scale(glm::vec3(1));
+                             // glm::scale(glm::vec3(6));
+    Material shell3_textured;
+    shell3_textured.ambient = glm::vec3(0.01f, 0.02f, 0.02f);
+    shell3_textured.diffuse = glm::vec3(148,106,154)/255.f;
+    // shell3_textured.diffuse = glm::vec3(.9f, 0.4f, 0.3f);
+    shell3_textured.specular = glm::vec3(0.5);
+    shell3_textured.shininess = 10.0;
+    seashell3->setMaterial(shell3_textured);
+    seashell3->setTransformation(seashellTransformation3);
+    seashellBox3->setTransformation(seashellTransformation3);
+    // pyramid->setTransformation(seashellTransformation3);
+
+
+    Mesh * coral1 = getMeshFromOBJ("coral2.obj");
+    Box * coralBox1 = new Box(coral1->getMinCoords(), coral1->getMaxCoords(), coral1);
+    glm::mat4 coralTransformation1 = glm::translate(glm::vec3(-20, 9.5, 26.7)) *
+                             glm::rotate((float) M_PI - .5f * angle, glm::vec3(1, 0, 0)) *
+                             glm::scale(glm::vec3(0.1));
+                             // glm::scale(glm::vec3(6));
+    Material coral1_textured;
+    coral1_textured.ambient = glm::vec3(0.01f, 0.02f, 0.02f);
+    // coral1_textured.diffuse = glm::vec3(0.7f, 0.2f, 0.2f);
+    coral1_textured.diffuse = glm::vec3(.9f, 0.4f, 0.3f);
+    coral1_textured.specular = glm::vec3(0.5);
+    coral1_textured.shininess = 10.0;
+    coral1->setMaterial(coral1_textured);
+    coral1->setTransformation(coralTransformation1);
+    coralBox1->setTransformation(coralTransformation1);
+    // pyramid->setTransformation(seashellTransformation3);
+    
     objects.push_back(seashellBox);
-    // objects.push_back(t1);
-    // objects.push_back(t2);
-    // objects.push_back(t3);
-    // objects.push_back(t4);
+    // objects.push_back(seashellBox2);
+    objects.push_back(seashellBox3);
+    // objects.push_back(coralBox1);
 
     Material refractive;
     refractive.reflectiveness = 0.1f;
@@ -970,9 +1080,9 @@ void sceneDefinition() {
     waffle_textured.shininess = 100;
 
     Material water_textured;
-    water_textured.specular = glm::vec3(.9f);
-    water_textured.shininess = 100;
+    water_textured.specular = glm::vec3(.6f);
     water_textured.refractiveness = .825f;
+    water_textured.refractive_ratio = .2f;
 
     Material sand_textured;
     sand_textured.specular = glm::vec3(.2f);
@@ -1032,8 +1142,11 @@ void sceneDefinition() {
     Material blue_diffuse;
     blue_diffuse.ambient = glm::vec3(0.06f, 0.06f, 0.09f);
     blue_diffuse.diffuse = glm::vec3(0.6f, 0.6f, 0.9f);
-    objects.push_back(new Plane(glm::vec3(0, 0, 0), glm::vec3(0.0, 1, 0), water_textured));
-    objects.push_back(new Plane(glm::vec3(0, -17, 0), glm::vec3(0, 1, .1), sand_textured));
+    objects.push_back(
+        new Plane(glm::vec3(0, 0, 10), glm::normalize(glm::vec3(0.0, 1, -2)), water_textured));
+    objects.push_back(
+        new Plane(glm::vec3(0, 0, 25), glm::normalize(glm::vec3(0, 1, -3)), sand_textured));
+
     // objects.push_back(new Plane(glm::vec3(0, 1, 30), glm::vec3(0.0, 0.0, -1.0), stone_textured));
     // objects.push_back(new Plane(glm::vec3(-15, 1, 0), glm::vec3(1.0, 0.0, 0.0), red_diffuse));
     // objects.push_back(new Plane(glm::vec3(15, 1, 0), glm::vec3(-1.0, 0.0, 0.0), blue_diffuse));
@@ -1057,7 +1170,8 @@ void sceneDefinition() {
     cone2->setTransformation(yellow_cone_trans);
     // objects.push_back(cone2);
 
-    lights.push_back(new Light(glm::vec3(2, 17, 8), glm::vec3(.5f)));
+    lights.push_back(new Light(glm::vec3(10, 16, -7), glm::vec3(.5f)));
+    // lights.push_back(new Light(glm::vec3(2, 1, -15), glm::vec3(.5f)));
     // lights.push_back(new Light(glm::vec3(6, 1, 17), glm::vec3(0.3)));
     // lights.push_back(new Light(glm::vec3(2, 7, 1), glm::vec3(0.2)));
 }
@@ -1119,7 +1233,7 @@ int main(int argc, const char * argv[]) {
     float Y = s * height / 2;
 
     cout << "Coloratin each pixel on the screne..." << endl;
-    glm::vec3 origin(0, 1, 0);
+    glm::vec3 origin(0, 0, 0);
     for (int i = 0; i < width; i++) {
 
         for (int j = 0; j < height; j++) {

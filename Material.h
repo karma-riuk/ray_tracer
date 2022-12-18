@@ -21,6 +21,7 @@ struct Material{
     float shininess = 0.0;
     float reflectiveness = 0.0;
     float refractiveness = 0.0;
+    float refractive_ratio = 0.0;
     Texture * texture = nullptr;
 };
 
